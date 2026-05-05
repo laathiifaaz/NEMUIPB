@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, Date, TIMESTAMP
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from database import Base
 
 
@@ -41,3 +42,28 @@ class Laporan(Base):
     status_laporan = Column(String)
     status_verifikasi = Column(String)
     catatan_verifikasi = Column(Text)
+    tanggal_verifikasi = Column(TIMESTAMP)
+
+class Notifikasi(Base):
+    __tablename__ = "notifikasi"
+
+    notifikasi_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+    laporan_id = Column(Integer, ForeignKey("laporan.laporan_id"))
+    pesan = Column(Text)
+    tanggal_kirim = Column(TIMESTAMP)
+    status_baca = Column(Boolean)
+
+class KlaimBarang(Base):
+    __tablename__ = "klaim_barang"
+
+    klaim_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+    barang_id = Column(Integer, ForeignKey("barang.barang_id"))
+    laporan_kehilangan_id = Column(Integer, ForeignKey("laporan.laporan_id"))
+
+    status_klaim = Column(String, default="diproses")
+    catatan_admin = Column(Text)
+
+    created_time = Column(TIMESTAMP, server_default=func.now())
+    updated_time = Column(TIMESTAMP, onupdate=func.now())
