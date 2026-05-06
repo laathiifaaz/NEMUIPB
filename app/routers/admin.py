@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from app.utils.security import get_current_user
 from datetime import datetime
 
 from app.database import SessionLocal
@@ -10,8 +11,19 @@ router = APIRouter(
     tags=["Admin"]
 )
 
+def ensure_admin(current_user: User):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak. User bukan admin"
+        )
+
 @router.get("/laporan")
-def get_all_laporan():
+def get_all_laporan(
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
     db = SessionLocal()
 
     data = (
@@ -40,17 +52,14 @@ def get_all_laporan():
     return result
 
 @router.patch("/laporan/{laporan_id}/setujui")
-def setujui_laporan(laporan_id: int, data: VerifikasiLaporan):
+def setujui_laporan(
+    laporan_id: int,
+    data: VerifikasiLaporan,
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
     db = SessionLocal()
-
-    admin = db.query(User).filter(
-        User.user_id == data.admin_id,
-        User.role == "admin"
-    ).first()
-
-    if not admin:
-        db.close()
-        raise HTTPException(status_code=403, detail="Akses ditolak. User bukan admin")
 
     laporan = db.query(Laporan).filter(Laporan.laporan_id == laporan_id).first()
 
@@ -58,7 +67,7 @@ def setujui_laporan(laporan_id: int, data: VerifikasiLaporan):
         db.close()
         raise HTTPException(status_code=404, detail="Laporan tidak ditemukan")
 
-    laporan.verified_by = data.admin_id
+    laporan.verified_by = current_user.user_id
     laporan.status_laporan = "disetujui"
     laporan.status_verifikasi = "terverifikasi"
     laporan.catatan_verifikasi = data.catatan_verifikasi
@@ -84,17 +93,14 @@ def setujui_laporan(laporan_id: int, data: VerifikasiLaporan):
     }
 
 @router.patch("/laporan/{laporan_id}/tolak")
-def tolak_laporan(laporan_id: int, data: VerifikasiLaporan):
+def tolak_laporan(
+    laporan_id: int,
+    data: VerifikasiLaporan,
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
     db = SessionLocal()
-
-    admin = db.query(User).filter(
-        User.user_id == data.admin_id,
-        User.role == "admin"
-    ).first()
-
-    if not admin:
-        db.close()
-        raise HTTPException(status_code=403, detail="Akses ditolak. User bukan admin")
 
     laporan = db.query(Laporan).filter(Laporan.laporan_id == laporan_id).first()
 
@@ -102,7 +108,7 @@ def tolak_laporan(laporan_id: int, data: VerifikasiLaporan):
         db.close()
         raise HTTPException(status_code=404, detail="Laporan tidak ditemukan")
 
-    laporan.verified_by = data.admin_id
+    laporan.verified_by = current_user.user_id
     laporan.status_laporan = "ditolak"
     laporan.status_verifikasi = "ditolak"
     laporan.catatan_verifikasi = data.catatan_verifikasi
@@ -128,17 +134,14 @@ def tolak_laporan(laporan_id: int, data: VerifikasiLaporan):
     }
 
 @router.patch("/barang/{barang_id}/status")
-def update_status_barang(barang_id: int, data: UpdateStatusBarang):
+def update_status_barang(
+    barang_id: int,
+    data: UpdateStatusBarang,
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
     db = SessionLocal()
-
-    admin = db.query(User).filter(
-        User.user_id == data.admin_id,
-        User.role == "admin"
-    ).first()
-
-    if not admin:
-        db.close()
-        raise HTTPException(status_code=403, detail="Akses ditolak. User bukan admin")
 
     barang = db.query(Barang).filter(Barang.barang_id == barang_id).first()
 

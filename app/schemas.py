@@ -8,7 +8,6 @@ class UserLogin(BaseModel):
 
 
 class LaporanCreate(BaseModel):
-    user_id: int
     nama_barang: str
     kategori: str
     deskripsi: str
@@ -45,20 +44,16 @@ class LaporanCreate(BaseModel):
 
 
 class VerifikasiLaporan(BaseModel):
-    admin_id: int
     catatan_verifikasi: str | None = None
 
 
 class UpdateStatusBarang(BaseModel):
-    admin_id: int
     status_barang: str
 
 class KlaimCreate(BaseModel):
-    user_id: int
     barang_id: int
     laporan_kehilangan_id: int
 
 class VerifikasiKlaim(BaseModel):
-    admin_id: int
     status_klaim: str
     catatan_admin: str | None = None

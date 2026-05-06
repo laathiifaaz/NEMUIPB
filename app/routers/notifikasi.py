@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from app.utils.security import get_current_user
 
 from app.database import SessionLocal
-from app.models import Notifikasi
+from app.models import Notifikasi, User
 
 router = APIRouter(
     prefix="/notifikasi",
@@ -9,11 +10,11 @@ router = APIRouter(
 )
 
 @router.get("/")
-def get_notifikasi(user_id: int):
+def get_notifikasi( current_user: User = Depends(get_current_user)):
     db = SessionLocal()
 
     notifikasi = db.query(Notifikasi).filter(
-        Notifikasi.user_id == user_id
+        Notifikasi.user_id == current_user.user_id
     ).order_by(Notifikasi.tanggal_kirim.desc()).all()
 
     db.close()

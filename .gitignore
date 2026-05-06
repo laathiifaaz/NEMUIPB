@@ -10,3 +10,6 @@ __pycache__/
 
 # Virtual environment
 venv/
+
+# Alat bantu hash
+hash_password.py

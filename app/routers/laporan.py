@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from app.utils.security import get_current_user
 
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan
@@ -17,19 +18,17 @@ def get_laporan():
     return laporan
 
 @router.post("/kehilangan")
-def buat_laporan_kehilangan(data: LaporanCreate):
+def buat_laporan_kehilangan(
+    data: LaporanCreate,
+    current_user: User = Depends(get_current_user)
+):
     db = SessionLocal()
 
-    user = db.query(User).filter(User.user_id == data.user_id).first()
-    if not user:
-        db.close()
-        raise HTTPException(status_code=404, detail="User tidak ditemukan")
-    
     duplikat = (
         db.query(Laporan)
         .join(Barang, Laporan.barang_id == Barang.barang_id)
         .filter(
-            Laporan.user_id == data.user_id,
+            Laporan.user_id == current_user.user_id,
             Laporan.jenis_laporan == "kehilangan",
             Barang.nama_barang.ilike(data.nama_barang),
             Barang.lokasi.ilike(data.lokasi),
@@ -62,7 +61,7 @@ def buat_laporan_kehilangan(data: LaporanCreate):
     barang_id = barang_baru.barang_id
 
     laporan_baru = Laporan(
-        user_id=data.user_id,
+        user_id=current_user.user_id,
         barang_id=barang_id,
         jenis_laporan="kehilangan",
         status_laporan="menunggu",
@@ -74,7 +73,6 @@ def buat_laporan_kehilangan(data: LaporanCreate):
     db.refresh(laporan_baru)
 
     laporan_id = laporan_baru.laporan_id
-
     db.close()
 
     return {
@@ -84,7 +82,8 @@ def buat_laporan_kehilangan(data: LaporanCreate):
     }
 
 @router.post("/penemuan")
-def buat_laporan_penemuan(data: LaporanCreate):
+def buat_laporan_penemuan(data: LaporanCreate,
+    current_user: User = Depends(get_current_user)):
     db = SessionLocal()
 
     user = db.query(User).filter(User.user_id == data.user_id).first()
@@ -96,7 +95,7 @@ def buat_laporan_penemuan(data: LaporanCreate):
         db.query(Laporan)
         .join(Barang, Laporan.barang_id == Barang.barang_id)
         .filter(
-            Laporan.user_id == data.user_id,
+            Laporan.user_id == current_user.user_id,
             Laporan.jenis_laporan == "penemuan",
             Barang.nama_barang.ilike(data.nama_barang),
             Barang.lokasi.ilike(data.lokasi),
@@ -129,7 +128,7 @@ def buat_laporan_penemuan(data: LaporanCreate):
     barang_id = barang_baru.barang_id
 
     laporan_baru = Laporan(
-        user_id=data.user_id,
+        user_id=current_user.user_id,
         barang_id=barang_id,
         jenis_laporan="penemuan",
         status_laporan="menunggu",
@@ -150,36 +149,38 @@ def buat_laporan_penemuan(data: LaporanCreate):
         "barang_id": barang_id
     }
 
-@router.get("/me")
-def get_my_laporan(user_id: int):
+@router.get("/kehilangan/me")
+def get_laporan_kehilangan_user(
+    current_user: User = Depends(get_current_user)
+):
     db = SessionLocal()
 
     data = (
         db.query(Laporan, Barang)
         .join(Barang, Laporan.barang_id == Barang.barang_id)
-        .filter(Laporan.user_id == user_id)
+        .filter(
+            Laporan.user_id == current_user.user_id,
+            Laporan.jenis_laporan == "kehilangan"
+        )
         .all()
     )
 
     result = []
+
     for laporan, barang in data:
         result.append({
             "laporan_id": laporan.laporan_id,
-            "jenis_laporan": laporan.jenis_laporan,
-            "status_laporan": laporan.status_laporan,
-            "status_verifikasi": laporan.status_verifikasi,
-            "barang_id": barang.barang_id,
             "nama_barang": barang.nama_barang,
             "kategori": barang.kategori,
-            "deskripsi": barang.deskripsi,
-            "tanggal_kejadian": barang.tanggal_kejadian,
             "lokasi": barang.lokasi,
-            "dokumentasi": barang.dokumentasi,
-            "status_barang": barang.status_barang
+            "tanggal_kejadian": barang.tanggal_kejadian,
+            "status_laporan": laporan.status_laporan
         })
 
     db.close()
+
     return result
+
 
 @router.get("/{laporan_id}")
 def get_detail_laporan(laporan_id: int):
@@ -219,34 +220,6 @@ def get_detail_laporan(laporan_id: int):
             "status_barang": barang.status_barang
         }
     }
-
-    db.close()
-    return result
-
-@router.get("/kehilangan/user/{user_id}")
-def get_laporan_kehilangan_user(user_id: int):
-    db = SessionLocal()
-
-    data = (
-        db.query(Laporan, Barang)
-        .join(Barang, Laporan.barang_id == Barang.barang_id)
-        .filter(
-            Laporan.user_id == user_id,
-            Laporan.jenis_laporan == "kehilangan"
-        )
-        .all()
-    )
-
-    result = []
-    for laporan, barang in data:
-        result.append({
-            "laporan_id": laporan.laporan_id,
-            "nama_barang": barang.nama_barang,
-            "kategori": barang.kategori,
-            "lokasi": barang.lokasi,
-            "tanggal_kejadian": barang.tanggal_kejadian,
-            "status_laporan": laporan.status_laporan
-        })
 
     db.close()
     return result
