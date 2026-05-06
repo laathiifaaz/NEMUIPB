@@ -1,7 +1,7 @@
 class AuthService {
   constructor() {
     // Pastikan ini sesuai dengan port FastAPI kamu (8000)
-    this.baseUrl = "http://127.0.0.1:8000";
+    this.baseUrl = "http://127.0.0.1:8001";
   }
 
   async login(username, password) {
