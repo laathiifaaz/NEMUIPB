@@ -1,15 +1,26 @@
-import { useEffect, useState } from "react";
+// src/App.js
+import React, { Component } from 'react';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 
-function App() {
-  const [data, setData] = useState("");
+class App extends Component {
+  state = { isLoggedIn: false };
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/")
-      .then(res => res.json())
-      .then(data => setData(data.message));
-  }, []);
+  // Fungsi ini WAJIB ada dan dikirim ke LoginPage
+  handleLoginSuccess = () => {
+    this.setState({ isLoggedIn: true });
+  };
 
-  return <h1>{data}</h1>;
+  render() {
+    return (
+      <div>
+        {this.state.isLoggedIn ? (
+          <DashboardPage />
+        ) : (
+          <LoginPage onLoginSuccess={this.handleLoginSuccess} />
+        )}
+      </div>
+    );
+  }
 }
-
 export default App;
