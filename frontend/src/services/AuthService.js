@@ -1,36 +1,34 @@
 class AuthService {
   constructor() {
-    // Pastikan ini sesuai dengan port FastAPI kamu (8000)
-    this.baseUrl = "http://127.0.0.1:8001";
+    this.baseUrl = "http://127.0.0.1:8000";
   }
 
   async login(username, password) {
-    // Kita menembak ke /login sesuai dengan dekorator @app.post("/login") di main.py
-    const response = await fetch(`${this.baseUrl}/login`, {
+    const response = await fetch(`${this.baseUrl}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        username: username,
-        password: password
+        username,
+        password,
       }),
     });
 
-    // Jika response tidak ok (401, 404, 422, dll)
     if (!response.ok) {
       const errorData = await response.json();
-      // Menampilkan pesan error spesifik dari FastAPI
       throw new Error(errorData.detail || "Gagal masuk ke sistem");
     }
 
     const data = await response.json();
 
-    // Simpan data user ke localStorage agar sesi tidak hilang saat refresh
-    if (data.user_id) {
-      localStorage.setItem("user_id", data.user_id);
-      localStorage.setItem("username", data.username);
-      localStorage.setItem("role", data.role);
+    if (data.access_token && data.user) {
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("token_type", data.token_type);
+      localStorage.setItem("user_id", data.user.user_id);
+      localStorage.setItem("username", data.user.username);
+      localStorage.setItem("email", data.user.email);
+      localStorage.setItem("role", data.user.role);
     }
 
     return data;
@@ -40,12 +38,35 @@ class AuthService {
     localStorage.clear();
   }
 
+  getToken() {
+    return localStorage.getItem("access_token");
+  }
+
+  getAuthHeaders() {
+    const token = this.getToken();
+
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  }
+
   getCurrentUser() {
     return {
       user_id: localStorage.getItem("user_id"),
       username: localStorage.getItem("username"),
-      role: localStorage.getItem("role")
+      email: localStorage.getItem("email"),
+      role: localStorage.getItem("role"),
+      token: localStorage.getItem("access_token"),
     };
+  }
+
+  isLoggedIn() {
+    return !!localStorage.getItem("access_token");
+  }
+
+  isAdmin() {
+    return localStorage.getItem("role") === "admin";
   }
 }
 

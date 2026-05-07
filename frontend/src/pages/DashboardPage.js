@@ -116,7 +116,7 @@ class DashboardPage extends Component {
             <div className="flex items-center gap-4">
               {/* MODE ADMIN: Hanya muncul jika role dari DB adalah 'admin' */}
               {userRole === 'admin' && (
-                <button className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-200 transition-all">
+                <button onClick={() => this.props.navigate("/admin")} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-200 transition-all">
                   <i className="fas fa-user-shield mr-2"></i> MODE ADMIN
                 </button>
               )}
