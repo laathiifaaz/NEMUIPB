@@ -4,6 +4,7 @@ import DashboardPage from "./pages/DashboardPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import LostReportPage from "./pages/LostReportPage";
 import VerificationReportPage from "./pages/VerificationReportPage";
+import AdminBarangPage from "./pages/AdminBarangPage";
 import AuthService from "./services/AuthService";
 
 
@@ -98,9 +99,20 @@ class App extends Component {
     }
 
     if (currentPath === "/lapor-kehilangan") {
-      return <LostReportPage navigate={this.navigate}
-      handleLogout={this.handleLogout}
-       />;
+      return (
+        <LostReportPage
+          navigate={this.navigate}
+          handleLogout={this.handleLogout}
+        />
+      );
+    }
+
+    if (currentPath === "/admin/barang") {
+      if (user.role !== "admin") {
+        return <DashboardPage navigate={this.navigate} />;
+      }
+
+      return <AdminBarangPage navigate={this.navigate} />;
     }
 
     return <DashboardPage navigate={this.navigate} />;

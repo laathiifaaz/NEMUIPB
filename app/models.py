@@ -67,3 +67,17 @@ class KlaimBarang(Base):
 
     created_time = Column(TIMESTAMP, server_default=func.now())
     updated_time = Column(TIMESTAMP, onupdate=func.now())
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    log_id = Column(Integer, primary_key=True, index=True)
+
+    barang_id = Column(Integer, ForeignKey("barang.barang_id"))
+    laporan_id = Column(Integer, ForeignKey("laporan.laporan_id"))
+    klaim_id = Column(Integer, ForeignKey("klaim_barang.klaim_id"))
+    admin_id = Column(Integer, ForeignKey("users.user_id"))
+
+    action_type = Column(String)
+    note = Column(Text)
+    created_at = Column(TIMESTAMP)

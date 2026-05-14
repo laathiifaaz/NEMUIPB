@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 
 from app.database import SessionLocal
-from app.models import User, Barang, Laporan, Notifikasi, KlaimBarang
+from app.models import User, Barang, Laporan, Notifikasi, KlaimBarang, ActivityLog
 from app.schemas import VerifikasiLaporan, UpdateStatusBarang, VerifikasiKlaim
 
 router = APIRouter(
@@ -18,6 +18,26 @@ def ensure_admin(current_user: User):
             status_code=403,
             detail="Akses ditolak. User bukan admin"
         )
+    
+def create_activity_log(
+    db,
+    action_type: str,
+    note: str,
+    admin_id: int = None,
+    barang_id: int = None,
+    laporan_id: int = None,
+    klaim_id: int = None
+):
+    log = ActivityLog(
+        action_type=action_type,
+        note=note,
+        admin_id=admin_id,
+        barang_id=barang_id,
+        laporan_id=laporan_id,
+        klaim_id=klaim_id
+    )
+
+    db.add(log)
 
 @router.get("/laporan")
 def get_all_laporan(
@@ -52,6 +72,96 @@ def get_all_laporan(
     db.close()
     return result
 
+@router.get("/laporan/recent")
+def get_recent_laporan(
+    status_verifikasi: str = "semua",
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    query = (
+        db.query(Laporan, Barang, User)
+        .join(Barang, Laporan.barang_id == Barang.barang_id)
+        .join(User, Laporan.user_id == User.user_id)
+    )
+
+    if status_verifikasi != "semua":
+        query = query.filter(Laporan.status_verifikasi == status_verifikasi)
+
+    data = (
+        query
+        .order_by(Laporan.laporan_id.desc())
+        .limit(10)
+        .all()
+    )
+
+    result = []
+
+    for laporan, barang, user in data:
+        result.append({
+            "laporan_id": laporan.laporan_id,
+            "item_name": barang.nama_barang,
+            "reporter": user.nama,
+            "email": user.email,
+            "jenis_laporan": laporan.jenis_laporan,
+            "status_laporan": laporan.status_laporan,
+            "status_verifikasi": laporan.status_verifikasi,
+            "barang_id": barang.barang_id,
+            "kategori": barang.kategori,
+            "deskripsi": barang.deskripsi,
+            "lokasi": barang.lokasi,
+            "dokumentasi": barang.dokumentasi,
+            "tanggal_kejadian": barang.tanggal_kejadian,
+            "status_barang": barang.status_barang,
+            "catatan_verifikasi": laporan.catatan_verifikasi,
+            "tanggal_verifikasi": laporan.tanggal_verifikasi
+        })
+
+    db.close()
+    return result
+
+@router.get("/klaim/pending")
+def get_pending_klaim(
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    data = (
+        db.query(KlaimBarang, Barang, User, Laporan)
+        .join(Barang, KlaimBarang.barang_id == Barang.barang_id)
+        .join(User, KlaimBarang.user_id == User.user_id)
+        .join(Laporan, KlaimBarang.laporan_kehilangan_id == Laporan.laporan_id)
+        .filter(KlaimBarang.status_klaim == "diproses")
+        .order_by(KlaimBarang.klaim_id.desc())
+        .all()
+    )
+
+    result = []
+
+    for klaim, barang, user, laporan in data:
+        result.append({
+            "klaim_id": klaim.klaim_id,
+            "user_id": user.user_id,
+            "pengklaim": user.nama,
+            "email": user.email,
+            "barang_id": barang.barang_id,
+            "nama_barang": barang.nama_barang,
+            "kategori": barang.kategori,
+            "lokasi": barang.lokasi,
+            "laporan_kehilangan_id": laporan.laporan_id,
+            "status_klaim": klaim.status_klaim,
+            "catatan_admin": klaim.catatan_admin,
+            "created_time": klaim.created_time
+        })
+
+    db.close()
+
+    return result
+
 @router.patch("/laporan/{laporan_id}/setujui")
 def setujui_laporan(
     laporan_id: int,
@@ -84,6 +194,16 @@ def setujui_laporan(
     )
 
     db.add(notifikasi)
+
+    create_activity_log(
+    db=db,
+    action_type="verified",
+    note=f"Laporan #{laporan.laporan_id} disetujui oleh admin",
+    admin_id=current_user.user_id,
+    barang_id=laporan.barang_id,
+    laporan_id=laporan.laporan_id
+    )
+
     db.commit()
 
     db.close()
@@ -125,6 +245,15 @@ def tolak_laporan(
     )
 
     db.add(notifikasi)
+    create_activity_log(
+    db=db,
+    action_type="rejected",
+    note=f"Laporan #{laporan.laporan_id} ditolak oleh admin",
+    admin_id=current_user.user_id,
+    barang_id=laporan.barang_id,
+    laporan_id=laporan.laporan_id
+    )  
+
     db.commit()
 
     db.close()
@@ -160,6 +289,14 @@ def update_status_barang(
         )
 
     barang.status_barang = data.status_barang
+
+    create_activity_log(
+    db=db,
+    action_type="status_updated",
+    note=f"Status barang #{barang.barang_id} diubah menjadi {data.status_barang}",
+    admin_id=current_user.user_id,
+    barang_id=barang.barang_id
+    )
 
     db.commit()
     db.close()
@@ -242,83 +379,6 @@ def get_admin_dashboard_chart(
 
     return list(reversed(result))
 
-@router.get("/laporan/recent")
-def get_recent_laporan(
-    current_user: User = Depends(get_current_user)
-):
-    ensure_admin(current_user)
-
-    db = SessionLocal()
-
-    data = (
-        db.query(Laporan, Barang, User)
-        .join(Barang, Laporan.barang_id == Barang.barang_id)
-        .join(User, Laporan.user_id == User.user_id)
-        .order_by(Laporan.laporan_id.desc())
-        .limit(10)
-        .all()
-    )
-
-    result = []
-
-    for laporan, barang, user in data:
-        result.append({
-            "laporan_id": laporan.laporan_id,
-            "item_name": barang.nama_barang,
-            "reporter": user.nama,
-            "email": user.email,
-            "jenis_laporan": laporan.jenis_laporan,
-            "status_laporan": laporan.status_laporan,
-            "status_verifikasi": laporan.status_verifikasi,
-            "status_barang": barang.status_barang,
-            "tanggal_kejadian": barang.tanggal_kejadian,
-            "lokasi": barang.lokasi
-        })
-
-    db.close()
-
-    return result
-
-@router.get("/klaim/pending")
-def get_pending_klaim(
-    current_user: User = Depends(get_current_user)
-):
-    ensure_admin(current_user)
-
-    db = SessionLocal()
-
-    data = (
-        db.query(KlaimBarang, Barang, User, Laporan)
-        .join(Barang, KlaimBarang.barang_id == Barang.barang_id)
-        .join(User, KlaimBarang.user_id == User.user_id)
-        .join(Laporan, KlaimBarang.laporan_kehilangan_id == Laporan.laporan_id)
-        .filter(KlaimBarang.status_klaim == "diproses")
-        .order_by(KlaimBarang.klaim_id.desc())
-        .all()
-    )
-
-    result = []
-
-    for klaim, barang, user, laporan in data:
-        result.append({
-            "klaim_id": klaim.klaim_id,
-            "user_id": user.user_id,
-            "pengklaim": user.nama,
-            "email": user.email,
-            "barang_id": barang.barang_id,
-            "nama_barang": barang.nama_barang,
-            "kategori": barang.kategori,
-            "lokasi": barang.lokasi,
-            "laporan_kehilangan_id": laporan.laporan_id,
-            "status_klaim": klaim.status_klaim,
-            "catatan_admin": klaim.catatan_admin,
-            "created_time": klaim.created_time
-        })
-
-    db.close()
-
-    return result
-
 @router.get("/laporan/export")
 def export_laporan(
     current_user: User = Depends(get_current_user)
@@ -353,6 +413,82 @@ def export_laporan(
             "lokasi": barang.lokasi,
             "tanggal_kejadian": barang.tanggal_kejadian,
             "status_barang": barang.status_barang
+        })
+
+    db.close()
+
+    return result
+
+@router.get("/logs")
+def get_activity_logs(
+    action_type: str = "semua",
+    sort_by: str = "newest",
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    query = (
+        db.query(ActivityLog, Barang, User)
+        .outerjoin(Barang, ActivityLog.barang_id == Barang.barang_id)
+        .outerjoin(User, ActivityLog.admin_id == User.user_id)
+    )
+
+    if action_type != "semua":
+        query = query.filter(ActivityLog.action_type == action_type)
+
+    if sort_by == "oldest":
+        query = query.order_by(ActivityLog.created_at.asc())
+    else:
+        query = query.order_by(ActivityLog.created_at.desc())
+
+    data = query.limit(25).all()
+
+    result = []
+
+    for log, barang, admin in data:
+        result.append({
+            "log_id": log.log_id,
+            "timestamp": log.created_at,
+            "item_id": f"#IPB-{barang.barang_id}" if barang else None,
+            "item_name": barang.nama_barang if barang else None,
+            "action_type": log.action_type,
+            "administrator": admin.nama if admin else "System",
+            "note": log.note
+        })
+
+    db.close()
+
+    return result
+
+@router.get("/logs/export")
+def export_activity_logs(
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    data = (
+        db.query(ActivityLog, Barang, User)
+        .outerjoin(Barang, ActivityLog.barang_id == Barang.barang_id)
+        .outerjoin(User, ActivityLog.admin_id == User.user_id)
+        .order_by(ActivityLog.created_at.desc())
+        .all()
+    )
+
+    result = []
+
+    for log, barang, admin in data:
+        result.append({
+            "log_id": log.log_id,
+            "timestamp": log.created_at,
+            "item_id": f"#IPB-{barang.barang_id}" if barang else None,
+            "item_name": barang.nama_barang if barang else None,
+            "action_type": log.action_type,
+            "administrator": admin.nama if admin else "System",
+            "note": log.note
         })
 
     db.close()
