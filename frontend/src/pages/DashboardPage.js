@@ -69,7 +69,13 @@ class DashboardPage extends Component {
           {/* Menu Navigasi */}
           <nav className="flex flex-col gap-2">
             <SidebarItem icon="fa-th-large" label="Beranda" active expanded={isSidebarExpanded} />
-            <SidebarItem icon="fa-box" label="Koleksi Barang" expanded={isSidebarExpanded} />
+            <div onClick={() => this.props.navigate('koleksi')}>
+              <SidebarItem 
+                icon="fa-box" 
+                label="Koleksi Barang" 
+                expanded={isSidebarExpanded} 
+              />
+            </div>
             <SidebarItem icon="fa-check-circle" label="Verifikasi" expanded={isSidebarExpanded} />
             <SidebarItem icon="fa-chart-bar" label="Analitik" expanded={isSidebarExpanded} />
             

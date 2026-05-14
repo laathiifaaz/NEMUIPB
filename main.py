@@ -7,6 +7,7 @@ from schemas import UserLogin, LaporanCreate, VerifikasiLaporan, UpdateStatusBar
 from sqlalchemy import or_
 from typing import Optional
 from datetime import date, timedelta, datetime
+from fastapi import HTTPException
 
 app = FastAPI()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

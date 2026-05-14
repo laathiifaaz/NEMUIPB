@@ -2,20 +2,38 @@
 import React, { Component } from 'react';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import KoleksiBarangPage from './pages/KoleksiBarangPage';
 
 class App extends Component {
-  state = { isLoggedIn: false };
+  state = {
+    isLoggedIn: false,
+    currentPage: 'dashboard'
+  };
 
-  // Fungsi ini WAJIB ada dan dikirim ke LoginPage
   handleLoginSuccess = () => {
     this.setState({ isLoggedIn: true });
+  };
+
+  changePage = (page) => {
+    this.setState({ currentPage: page });
+  };
+
+  renderPage = () => {
+    switch (this.state.currentPage) {
+      case 'koleksi':
+        return <KoleksiBarangPage navigate={this.changePage} />;
+
+      case 'dashboard':
+      default:
+        return <DashboardPage navigate={this.changePage} />;
+    }
   };
 
   render() {
     return (
       <div>
         {this.state.isLoggedIn ? (
-          <DashboardPage />
+          this.renderPage()
         ) : (
           <LoginPage onLoginSuccess={this.handleLoginSuccess} />
         )}
@@ -23,4 +41,5 @@ class App extends Component {
     );
   }
 }
+
 export default App;

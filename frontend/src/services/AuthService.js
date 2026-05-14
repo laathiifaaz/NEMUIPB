@@ -1,7 +1,7 @@
 class AuthService {
   constructor() {
     // Pastikan ini sesuai dengan port FastAPI kamu (8000)
-    this.baseUrl = "http://127.0.0.1:8001";
+    this.baseUrl = "http://127.0.0.1:8000";
   }
 
   async login(username, password) {
@@ -46,6 +46,18 @@ class AuthService {
       username: localStorage.getItem("username"),
       role: localStorage.getItem("role")
     };
+  }
+
+  // Di dalam AuthService.js
+  async filterBarang(params) {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${this.baseUrl}/barang/filter?${queryString}`); // PASTIIN /barang/filter
+    return await response.json();
+  }
+
+  async searchBarang(keyword) {
+    const response = await fetch(`${this.baseUrl}/barang/search?keyword=${keyword}`); // PASTIIN /barang/search
+    return await response.json();
   }
 }
 
