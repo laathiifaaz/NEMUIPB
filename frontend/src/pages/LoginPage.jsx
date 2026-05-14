@@ -1,10 +1,11 @@
 import React, { Component } from 'react';
 import AuthService from '../services/AuthService';
+import ErrorModal from "../components/ErrorModal";
 
 class LoginPage extends Component {
   constructor(props) {
     super(props);
-    this.state = { username: '', password: '', loading: false, error: null };
+    this.state = { username: '', password: '', loading: false, showError: false, errorMessage: " " };
   }
 
   handleChange = (e) => {
@@ -12,18 +13,29 @@ class LoginPage extends Component {
   }
 
     // Di dalam handleLogin di LoginPage.js
-    handleLogin = async (e) => {
-      e.preventDefault();
-      try {
-        const result = await AuthService.login(this.state.username, this.state.password);
-        
-        // Kalau ini tidak dipanggil, halaman tidak akan pindah!
-        this.props.onLoginSuccess(); 
-        
-      } catch (err) {
-        alert("Login Gagal: " + err.message);
-      }
-    };
+  handleLogin = async (e) => {
+    e.preventDefault();
+
+    this.setState({ loading: true, error: null });
+
+    try {
+      const result = await AuthService.login(
+        this.state.username,
+        this.state.password
+      );
+
+      // 🔥 ini HARUS dipanggil kalau sukses
+      this.props.onLoginSuccess();
+
+      console.log("username:", this.state.username);
+      console.log("password:", this.state.password);
+
+    } catch (err) {
+      this.setState({ showError: true, errorMessage: err.message, });
+    } finally {
+      this.setState({ loading: false });
+    }
+  };
 
   render() {
     return (
@@ -32,7 +44,7 @@ class LoginPage extends Component {
           <div className="hidden lg:flex w-[60%] relative p-20 flex-col justify-end overflow-hidden">
             {/* Gambar Background */}
             <img 
-              src="/assets/images/ipb-background.jpg" 
+              src="/images/logo-ipb.png" 
               alt="IPB Campus" 
               className="absolute inset-0 w-full h-full object-cover"
             />
@@ -52,16 +64,29 @@ class LoginPage extends Component {
 
         {/* SISI KANAN: LOGIN AREA */}
         <div className="w-full lg:w-[40%] bg-white flex flex-col p-12 relative">
-          
-          {/* Header Logo */}
+
           <div className="flex items-center gap-3 mb-20">
-            <div className="w-12 h-12 bg-[#002B5B] rounded-lg flex items-center justify-center p-2">
-              <img src="/assets/images/logo-ipb.png" alt="IPB" className="w-full h-full object-contain" />
+
+            {/* LOGO WRAPPER (INI YANG KAMU ATUR) */}
+            <div className="flex items-center justify-center h-14">
+              <img
+                src="/images/logo-nemuipb.png"
+                alt="IPB"
+                className="w-14 h-14 object-contain"
+                style={{ transform: "translateY(10px)" }} // 👈 bisa kamu geser naik/turun
+              />
             </div>
-            <div>
-              <h2 className="font-extrabold text-[#002B5B] text-lg leading-none">NEMU IPB</h2>
-              <p className="text-[10px] font-bold text-gray-400 tracking-tighter">IPB LOST & FOUND</p>
+
+            {/* TEXT */}
+            <div className="flex flex-col justify-center h-16">
+              <h2 className="font-extrabold text-[#002B5B] text-lg leading-none m-0">
+                NEMU IPB
+              </h2>
+              <p className="text-[10px] font-bold text-gray-400 leading-none m-0">
+                IPB LOST & FOUND
+              </p>
             </div>
+
           </div>
 
           {/* Form Utama */}
@@ -141,6 +166,17 @@ class LoginPage extends Component {
             © 2026 IPB University. All rights reserved.
           </div>
         </div>
+
+      <ErrorModal
+      show={this.state.showError}
+      message={this.state.errorMessage}
+      onClose={() =>
+        this.setState({
+          showError: false,
+          errorMessage: "",
+        })
+      }
+    />
       </div>
     );
   }

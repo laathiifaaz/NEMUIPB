@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.utils.security import get_current_user
-
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan
 from app.schemas import LaporanCreate
@@ -174,7 +173,9 @@ def get_laporan_kehilangan_user(
             "kategori": barang.kategori,
             "lokasi": barang.lokasi,
             "tanggal_kejadian": barang.tanggal_kejadian,
-            "status_laporan": laporan.status_laporan
+            "status_laporan": laporan.status_laporan,
+            "jenis_laporan": laporan.jenis_laporan,
+            "catatan_verifikasi": laporan.catatan_verifikasi
         })
 
     db.close()

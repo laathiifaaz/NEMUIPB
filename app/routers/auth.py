@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-
 from app.database import SessionLocal
 from app.models import User
 from app.schemas import UserLogin
@@ -23,69 +22,40 @@ def get_users():
 def login(user: UserLogin):
     db = SessionLocal()
 
-    email = f"{user.username}@apps.ipb.ac.id"
+    try:
+        # format email dari username input frontend
+        email = f"{user.username}@apps.ipb.ac.id"
 
-    db_user = db.query(User).filter(User.email == email).first()
+        # cari user di database
+        db_user = db.query(User).filter(User.email == email).first()
 
-    # Kalau user belum ada → buat otomatis
-    if not db_user:
-        hashed_password = pwd_context.hash(user.password)
+        # kalau user tidak ditemukan
+        if not db_user:
+            raise HTTPException(status_code=401, detail="User tidak ditemukan")
 
-        new_user = User(
-            nama=user.username,
-            email=email,
-            password_hash=hashed_password,
-            role="civitas",
-            status_akun=True
-        )
+        # cek password
+        if not pwd_context.verify(user.password, db_user.password_hash):
+            raise HTTPException(status_code=401, detail="Password salah")
 
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-
+        # generate token
         access_token = create_access_token({
-            "user_id": new_user.user_id,
-            "username": user.username,
-            "role": new_user.role
+            "user_id": db_user.user_id,
+            "username": db_user.nama,   
+            "role": db_user.role
         })
 
-        result = {
-            "message": "User baru dibuat & login berhasil",
+        # response sukses
+        return {
+            "message": "Login berhasil",
             "access_token": access_token,
             "token_type": "bearer",
             "user": {
-                "user_id": new_user.user_id,
-                "username": user.username,
-                "email": new_user.email,
-                "role": new_user.role
+                "user_id": db_user.user_id,
+                "username": db_user.nama,   
+                "email": db_user.email,
+                "role": db_user.role
             }
         }
 
+    finally:
         db.close()
-        return result
-
-    # Kalau user sudah ada → cek password
-    if not pwd_context.verify(user.password, db_user.password_hash):
-        db.close()
-        raise HTTPException(status_code=401, detail="Password salah")
-
-    access_token = create_access_token({
-        "user_id": db_user.user_id,
-        "username": user.username,
-        "role": db_user.role
-    })
-
-    result = {
-        "message": "Login berhasil",
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "user_id": db_user.user_id,
-            "username": user.username,
-            "email": db_user.email,
-            "role": db_user.role
-        }
-    }
-
-    db.close()
-    return result
