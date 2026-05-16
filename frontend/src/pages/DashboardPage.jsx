@@ -3,6 +3,12 @@
 import React, { Component } from 'react';
 import AuthService from '../services/AuthService';
 import Sidebar from '../components/Sidebar';
+import PageHeader from '../components/PageHeader';
+import PageFooter from '../components/PageFooter';
+import {
+  getStoredSidebarExpanded,
+  setStoredSidebarExpanded,
+} from '../utils/sidebarState';
 
 class DashboardPage extends Component {
   constructor(props) {
@@ -11,7 +17,7 @@ class DashboardPage extends Component {
     this.state = {
 
       // TAMBAHAN
-      isSidebarExpanded: true,
+      isSidebarExpanded: getStoredSidebarExpanded(),
 
       userRole: "",
       userName: "",
@@ -60,8 +66,11 @@ class DashboardPage extends Component {
 
   // TAMBAHAN
   toggleSidebar = () => {
-    this.setState({
-      isSidebarExpanded: !this.state.isSidebarExpanded
+    this.setState((prevState) => {
+      const isSidebarExpanded = !prevState.isSidebarExpanded;
+      setStoredSidebarExpanded(isSidebarExpanded);
+
+      return { isSidebarExpanded };
     });
   };
 
@@ -79,57 +88,27 @@ class DashboardPage extends Component {
 
         {/* SIDEBAR COMPONENT */}
         <Sidebar
-          isSidebarExpanded={isSidebarExpanded}
+          expanded={isSidebarExpanded}
           handleLogout={this.handleLogout}
           navigate={this.props.navigate}
         />
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 ml-20 overflow-y-auto px-6 md:px-12 py-8">
+        <main
+          className={`
+            flex-1 overflow-y-auto px-6 md:px-12 py-8
+            transition-[margin] duration-300
+            ${isSidebarExpanded ? "ml-64" : "ml-0"}
+          `}
+        >
 
-          {/* HEADER */}
-          <header className="flex justify-between items-center mb-10">
-
-            <div className="flex items-center gap-4">
-
-              {/* Toggle */}
-              <button
-                onClick={this.toggleSidebar}
-                className="text-[#002B5B] hover:bg-gray-100 p-2 rounded-lg transition-colors"
-              >
-                <i className="fas fa-bars text-xl"></i>
-              </button>
-
-              <h2 className="font-bold text-[#002B5B] text-xl hidden sm:block">
-                DASHBOARD
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-4">
-
-              {userRole === 'admin' && (
-                <button
-                  onClick={() => this.props.navigate("/admin")}
-                  className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-200 transition-all"
-                >
-                  <i className="fas fa-user-shield mr-2"></i>
-                  MODE ADMIN
-                </button>
-              )}
-
-              <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100">
-
-                <span className="text-xs font-bold text-[#002B5B] hidden md:block">
-                  {userName}
-                </span>
-
-                <div className="w-8 h-8 bg-[#002B5B]/10 rounded-full flex items-center justify-center">
-
-                  <i className="fas fa-user text-[#002B5B] text-xs"></i>
-                </div>
-              </div>
-            </div>
-          </header>
+          <PageHeader
+            onToggleSidebar={this.toggleSidebar}
+            navigate={this.props.navigate}
+            showAdminModeButton={true}
+            userRole={userRole}
+            userName={userName}
+          />
 
           {/* HERO */}
           <section className="bg-white rounded-[40px] border border-gray-100 p-8 md:p-12 flex flex-col lg:flex-row items-center mb-16 shadow-sm">
@@ -254,6 +233,8 @@ class DashboardPage extends Component {
               ))}
             </div>
           </section>
+
+          <PageFooter />
         </main>
       </div>
     );

@@ -2,6 +2,12 @@ import React, { Component } from "react";
 import AuthService from "../services/AuthService";
 import AdminSidebar from "../components/admin/AdminSidebar";
 import AdminBarangService from "../services/AdminBarangService";
+import PageHeader from "../components/PageHeader";
+import PageFooter from "../components/PageFooter";
+import {
+  getStoredSidebarExpanded,
+  setStoredSidebarExpanded,
+} from "../utils/sidebarState";
 
 class AdminBarangPage extends Component {
   constructor(props) {
@@ -9,12 +15,11 @@ class AdminBarangPage extends Component {
 
     this.state = {
       logs: [],
-      kategori: "semua",
-      status: "semua",
-      lokasi: "",
+      actionType: "semua",
+      sortBy: "newest",
       isLoading: true,
       error: null,
-      isSidebarExpanded: true,
+      isSidebarExpanded: getStoredSidebarExpanded(),
     };
   }
 
@@ -27,7 +32,7 @@ class AdminBarangPage extends Component {
       return;
     }
 
-    await this.loadBarang();
+    await this.loadLogs();
   }
 
   goToUserMode = () => {
@@ -39,14 +44,20 @@ class AdminBarangPage extends Component {
   };
 
   toggleSidebar = () => {
-    this.setState({
-      isSidebarExpanded: !this.state.isSidebarExpanded,
+    this.setState((prevState) => {
+      const isSidebarExpanded = !prevState.isSidebarExpanded;
+      setStoredSidebarExpanded(isSidebarExpanded);
+
+      return { isSidebarExpanded };
     });
   };
 
-  loadBarang = async () => {
+  loadLogs = async () => {
     try {
-      const data = await AdminBarangService.getLogs();
+      const data = await AdminBarangService.getLogs(
+        this.state.actionType,
+        this.state.sortBy
+      );
 
       this.setState({
         logs: data,
@@ -68,43 +79,22 @@ class AdminBarangPage extends Component {
   };
 
   handleFilter = async () => {
-    try {
-      this.setState({ isLoading: true });
-
-      const params = {
-        kategori: this.state.kategori,
-        status: this.state.status,
-      };
-
-      if (this.state.lokasi.trim() !== "") {
-        params.lokasi = this.state.lokasi;
-      }
-
-      const data = await AdminBarangService.filterBarang(params);
-
-      this.setState({
-        logs: data,
-        isLoading: false,
-      });
-    } catch (error) {
-      this.setState({
-        error: error.message,
-        isLoading: false,
-      });
-    }
+    this.setState({ isLoading: true }, async () => {
+      await this.loadLogs();
+    });
   };
 
   convertToCSV = (data) => {
     if (!data || data.length === 0) return "";
 
     const headers = [
-      "barang_id",
-      "nama_barang",
-      "kategori",
-      "deskripsi",
-      "tanggal_kejadian",
-      "lokasi",
-      "status_barang",
+      "log_id",
+      "timestamp",
+      "item_id",
+      "item_name",
+      "action_type",
+      "administrator",
+      "note",
     ];
 
     const rows = data.map((item) =>
@@ -119,36 +109,50 @@ class AdminBarangPage extends Component {
     return [headers.join(","), ...rows].join("\n");
   };
 
-  handleExport = () => {
-    const csv = this.convertToCSV(this.state.barang);
+  handleExport = async () => {
+    try {
+      const data = await AdminBarangService.exportLogs();
+      const csv = this.convertToCSV(data);
 
-    if (!csv) {
-      alert("Tidak ada data untuk diexport");
-      return;
+      if (!csv) {
+        alert("Tidak ada data untuk diexport");
+        return;
+      }
+
+      const blob = new Blob([csv], {
+        type: "text/csv;charset=utf-8;",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "activity-logs-nemuipb.csv";
+      link.click();
+
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error.message);
     }
-
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "koleksi-barang-nemuipb.csv";
-    link.click();
-
-    URL.revokeObjectURL(url);
   };
 
-  getStatusClass(status) {
-    if (status === "ditemukan") return "bg-[#006D8F] text-white";
-    if (status === "hilang") return "bg-blue-100 text-[#002B5B]";
-    if (status === "selesai" || status === "dikembalikan") {
-      return "bg-[#F4D35E] text-[#5C4A00]";
-    }
+  getActionClass(actionType) {
+    if (actionType === "verified") return "bg-green-100 text-green-700";
+    if (actionType === "rejected") return "bg-red-100 text-red-700";
+    if (actionType === "status_updated") return "bg-blue-100 text-[#002B5B]";
+    if (actionType === "returned") return "bg-[#F4D35E] text-[#5C4A00]";
+    if (actionType === "claim_pending") return "bg-purple-100 text-purple-700";
 
-    return "bg-gray-100 text-gray-500";
+    return "bg-gray-100 text-gray-600";
+  }
+
+  formatTimestamp(timestamp) {
+    if (!timestamp) return "-";
+
+    return new Date(timestamp).toLocaleString("id-ID", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
   }
 
   render() {
@@ -163,99 +167,89 @@ class AdminBarangPage extends Component {
             navigate={this.props.navigate}
           />
 
-          <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-            <header className="bg-white rounded-2xl px-8 py-5 flex items-center justify-between mb-8 shadow-sm">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={this.toggleSidebar}
-                  className="text-[#002B5B] hover:bg-gray-100 p-2 rounded-lg transition-colors"
-                >
-                  <i className="fas fa-bars text-2xl"></i>
-                </button>
+          <main
+            className={`
+              flex-1 p-6 md:p-10 overflow-y-auto
+              transition-[margin] duration-300
+              ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+            `}
+          >
+            <PageHeader
+              onToggleSidebar={this.toggleSidebar}
+              profileIcon="fa-user-shield"
+              actions={
+                <>
+                  <button
+                    type="button"
+                    onClick={this.goToUserMode}
+                    className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
+                  >
+                    <i className="fas fa-user mr-2"></i>
+                    Mode User
+                  </button>
 
-                <h1 className="font-extrabold text-[#002B5B] text-xl">
-                  NEMUIPB
-                </h1>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={this.handleExport}
-                  className="bg-gray-100 text-[#002B5B] px-5 py-3 rounded-xl text-xs font-bold"
-                >
-                  <i className="fas fa-download mr-2"></i>
-                  Export CSV
-                </button>
-
-                <button className="bg-[#002B5B] text-white px-5 py-3 rounded-xl text-xs font-bold">
-                  <i className="fas fa-plus-square mr-2"></i>
-                  Report Item
-                </button>
-              </div>
-            </header>
+                  <button
+                    type="button"
+                    onClick={this.handleExport}
+                    className="bg-gray-100 text-[#002B5B] px-5 py-3 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all"
+                  >
+                    <i className="fas fa-download mr-2"></i>
+                    Export CSV
+                  </button>
+                </>
+              }
+            />
 
             <section className="mb-8">
               <h2 className="text-4xl font-extrabold mb-2">Koleksi Barang</h2>
               <p className="text-gray-500 text-sm max-w-xl">
-                Daftar seluruh barang hilang, ditemukan, diklaim, dan
-                dikembalikan dalam sistem NEMU IPB.
+                Riwayat aktivitas barang, laporan, klaim, dan perubahan status
+                pada sistem NEMU IPB.
               </p>
             </section>
 
             <section className="bg-white rounded-[24px] p-6 mb-8 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase">
-                    Kategori
+                    Action Type
                   </label>
+
                   <select
-                    name="kategori"
-                    value={this.state.kategori}
+                    name="actionType"
+                    value={this.state.actionType}
                     onChange={this.handleChange}
                     className="w-full mt-2 bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none"
                   >
-                    <option value="semua">Semua Kategori</option>
-                    <option value="Elektronik">Elektronik</option>
-                    <option value="Alat Tulis">Alat Tulis</option>
-                    <option value="Barang Pribadi">Barang Pribadi</option>
+                    <option value="semua">Semua Aktivitas</option>
+                    <option value="verified">Verified</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="status_updated">Status Updated</option>
+                    <option value="claim_pending">Claim Pending</option>
+                    <option value="returned">Returned</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase">
-                    Status
+                    Sort
                   </label>
+
                   <select
-                    name="status"
-                    value={this.state.status}
+                    name="sortBy"
+                    value={this.state.sortBy}
                     onChange={this.handleChange}
                     className="w-full mt-2 bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none"
                   >
-                    <option value="semua">Semua Status</option>
-                    <option value="hilang">Hilang</option>
-                    <option value="ditemukan">Ditemukan</option>
-                    <option value="diklaim">Diklaim</option>
-                    <option value="selesai">Selesai</option>
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase">
-                    Lokasi
-                  </label>
-                  <input
-                    name="lokasi"
-                    value={this.state.lokasi}
-                    onChange={this.handleChange}
-                    placeholder="Semua lokasi"
-                    className="w-full mt-2 bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none"
-                  />
                 </div>
 
                 <div className="flex items-end">
                   <button
                     onClick={this.handleFilter}
-                    className="w-full bg-[#002B5B] text-white rounded-xl px-5 py-3 text-sm font-bold"
+                    className="w-full bg-[#002B5B] text-white rounded-xl px-5 py-3 text-sm font-bold hover:bg-[#001f42] transition-all"
                   >
                     Terapkan Filter
                   </button>
@@ -271,7 +265,7 @@ class AdminBarangPage extends Component {
               )}
 
               {isLoading ? (
-                <p className="text-gray-400 text-sm">Loading barang...</p>
+                <p className="text-gray-400 text-sm">Loading logs...</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -289,33 +283,39 @@ class AdminBarangPage extends Component {
                     <tbody>
                       {logs.map((log) => (
                         <tr
-                            key={log.log_id}
-                            className="border-b border-gray-50 hover:bg-gray-50"
+                          key={log.log_id}
+                          className="border-b border-gray-50 hover:bg-gray-50"
+                        >
+                          <td className="py-5 font-black text-xs text-[#002B5B]">
+                            {log.item_id || "-"}
+                          </td>
+
+                          <td className="py-5 font-bold">
+                            {log.item_name || "-"}
+                          </td>
+
+                          <td className="py-5">
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-black ${this.getActionClass(
+                                log.action_type
+                              )}`}
                             >
-                            <td className="py-5 font-black text-xs text-[#002B5B]">
-                                {log.item_id}
-                            </td>
+                              {log.action_type}
+                            </span>
+                          </td>
 
-                            <td className="py-5 font-bold">
-                                {log.item_name}
-                            </td>
+                          <td className="py-5 text-gray-500">
+                            {log.administrator || "System"}
+                          </td>
 
-                            <td className="py-5 text-gray-500">
-                                {log.action_type}
-                            </td>
+                          <td className="py-5 text-gray-500 max-w-md">
+                            {log.note || "-"}
+                          </td>
 
-                            <td className="py-5 text-gray-500">
-                                {log.administrator}
-                            </td>
-
-                            <td className="py-5 text-gray-500">
-                                {log.note}
-                            </td>
-
-                            <td className="py-5 text-gray-500">
-                                {new Date(log.timestamp).toLocaleString()}
-                            </td>
-                            </tr>
+                          <td className="py-5 text-gray-500">
+                            {this.formatTimestamp(log.timestamp)}
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -323,15 +323,11 @@ class AdminBarangPage extends Component {
               )}
 
               <div className="flex justify-between items-center mt-8 text-xs text-gray-500">
-                <p>Showing {logs.length} items</p>
+                <p>Showing {logs.length} logs</p>
               </div>
             </section>
 
-            <footer className="mt-16 border-t border-gray-200 py-8 text-xs text-gray-400 flex gap-4">
-              <span className="font-black text-[#002B5B]">NEMU IPB</span>
-              <span>|</span>
-              <span>© 2026 IPB University. All rights reserved.</span>
-            </footer>
+            <PageFooter />
           </main>
         </div>
       </div>

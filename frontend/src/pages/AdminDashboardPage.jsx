@@ -2,6 +2,12 @@ import React, { Component } from "react";
 import AuthService from "../services/AuthService";
 import AdminService from "../services/AdminService";
 import AdminSidebar from "../components/admin/AdminSidebar";
+import PageHeader from "../components/PageHeader";
+import PageFooter from "../components/PageFooter";
+import {
+  getStoredSidebarExpanded,
+  setStoredSidebarExpanded,
+} from "../utils/sidebarState";
 
 class AdminDashboardPage extends Component {
   constructor(props) {
@@ -27,7 +33,7 @@ class AdminDashboardPage extends Component {
       showFilterMenu: false,
       isLoading: true,
       error: null,
-      isSidebarExpanded: true,
+      isSidebarExpanded: getStoredSidebarExpanded(),
     };
   }
 
@@ -44,8 +50,11 @@ class AdminDashboardPage extends Component {
   }
 
   toggleSidebar = () => {
-    this.setState({
-      isSidebarExpanded: !this.state.isSidebarExpanded,
+    this.setState((prevState) => {
+      const isSidebarExpanded = !prevState.isSidebarExpanded;
+      setStoredSidebarExpanded(isSidebarExpanded);
+
+      return { isSidebarExpanded };
     });
   };
 
@@ -460,34 +469,27 @@ class AdminDashboardPage extends Component {
             navigate={this.props.navigate}
           />
 
-          <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-            <header className="bg-white rounded-2xl px-8 py-5 flex items-center justify-between mb-8 shadow-sm">
-                <div className="flex items-center gap-4">
-                    <button
-                    onClick={this.toggleSidebar}
-                    className="text-[#002B5B] hover:bg-gray-100 p-2 rounded-lg transition-colors"
-                    >
-                    <i className="fas fa-bars text-2xl"></i>
-                    </button>
-
-                    <h1 className="font-extrabold text-[#002B5B] text-xl">
-                    NEMUIPB
-                    </h1>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <button
-                    onClick={this.goToUserMode}
-                    className="bg-[#002B5B] text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#001f42] transition-all"
-                    >
-                    User Mode
-                    </button>
-
-                    <div className="w-11 h-11 bg-[#002B5B]/10 rounded-xl flex items-center justify-center">
-                    <i className="fas fa-user-shield text-[#002B5B]"></i>
-                    </div>
-                </div>
-                </header>
+          <main
+            className={`
+              flex-1 p-6 md:p-10 overflow-y-auto
+              transition-[margin] duration-300
+              ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+            `}
+          >
+            <PageHeader
+              onToggleSidebar={this.toggleSidebar}
+              profileIcon="fa-user-shield"
+              actions={
+                <button
+                  type="button"
+                  onClick={this.goToUserMode}
+                  className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
+                >
+                  <i className="fas fa-user mr-2"></i>
+                  Mode User
+                </button>
+              }
+            />
 
             {error && (
               <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 text-sm font-bold">
@@ -724,6 +726,8 @@ class AdminDashboardPage extends Component {
                 <p>Showing {reports.length} reports</p>
               </div>
             </section>
+
+            <PageFooter />
 
             {this.renderDetailModal()}
           </main>

@@ -75,30 +75,64 @@ class Sidebar extends Component {
     };
   }
 
+  isControlledExpanded() {
+    return (
+      typeof this.props.expanded === "boolean" ||
+      typeof this.props.isSidebarExpanded === "boolean"
+    );
+  }
+
+  getExpanded() {
+    if (typeof this.props.expanded === "boolean") {
+      return this.props.expanded;
+    }
+
+    if (typeof this.props.isSidebarExpanded === "boolean") {
+      return this.props.isSidebarExpanded;
+    }
+
+    return this.state.expanded;
+  }
+
+  setHoverExpanded(expanded) {
+    if (!this.isControlledExpanded()) {
+      this.setState({ expanded });
+    }
+  }
+
+  handleNavigate(path) {
+    if (this.props.navigate) {
+      this.props.navigate(path);
+    }
+  }
+
   render() {
-    const { expanded, laporanDropdown } = this.state;
-    const { navigate, currentPath } = this.props;
+    const expanded = this.getExpanded();
+    const { laporanDropdown } = this.state;
+    const currentPath = this.props.currentPath || window.location.pathname;
 
     return (
       <aside
-        onMouseEnter={() => this.setState({ expanded: true })}
-        onMouseLeave={() => this.setState({ expanded: false })}
+        aria-hidden={!expanded}
+        onMouseEnter={() => this.setHoverExpanded(true)}
+        onMouseLeave={() => this.setHoverExpanded(false)}
         className={`
           fixed
           top-0
           left-0
           h-screen
           z-50
-          ${expanded ? "w-64" : "w-20"}
+          ${expanded ? "w-64 px-4" : "w-0 px-0"}
           bg-[#F8FAFC]
-          border-r
+          ${expanded ? "border-r" : "border-r-0"}
           border-gray-100
           flex
           flex-col
           py-8
-          px-4
           shadow-sm
-          transition-[width] duration-300
+          overflow-x-hidden
+          ${expanded ? "pointer-events-auto" : "pointer-events-none"}
+          transition-[width,padding] duration-300
         `}
       >
         {/* LOGO */}
@@ -106,7 +140,7 @@ class Sidebar extends Component {
           <img
             src="/images/logo-nemuipb.png"
             alt="Logo"
-            className="w-14 h-14 object-contain transition-all duration-300"
+            className="w-12 h-12 object-contain transition-all duration-300 flex-shrink-0"
           />
 
           <div
@@ -117,7 +151,7 @@ class Sidebar extends Component {
             `}
           >
             <h1
-              onClick={() => navigate("/dashboard")}
+              onClick={() => this.handleNavigate("/dashboard")}
               className="font-bold text-[#002B5B] text-lg leading-none cursor-pointer"
             >
               NEMU IPB
@@ -132,7 +166,7 @@ class Sidebar extends Component {
         {/* MENU */}
         <nav className="flex flex-col gap-2">
           {/* BERANDA */}
-          <div onClick={() => navigate("/dashboard")}>
+          <div onClick={() => this.handleNavigate("/dashboard")}>
             <SidebarItem
               icon="fa-th-large"
               label="Beranda"
@@ -149,7 +183,7 @@ class Sidebar extends Component {
           />
 
           {/* VERIFIKASI */}
-          <div onClick={() => navigate("/verifikasi")}>
+          <div onClick={() => this.handleNavigate("/verifikasi")}>
             <SidebarItem
               icon="fa-check-circle"
               label="Verifikasi"
@@ -188,7 +222,7 @@ class Sidebar extends Component {
             <div className="ml-6 flex flex-col gap-1 mt-1">
 
               <div
-                onClick={() => navigate("/lapor-kehilangan")}
+                onClick={() => this.handleNavigate("/lapor-kehilangan")}
                 className={`
                   flex items-center px-4 py-3 rounded-xl cursor-pointer text-sm font-semibold transition-all
                   ${
@@ -203,7 +237,7 @@ class Sidebar extends Component {
               </div>
 
               <div
-                onClick={() => navigate("/lapor-penemuan")}
+                onClick={() => this.handleNavigate("/lapor-penemuan")}
                 className={`
                   flex items-center px-4 py-3 rounded-xl cursor-pointer text-sm font-semibold transition-all
                   ${

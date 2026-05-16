@@ -1,6 +1,12 @@
 import React, { Component } from "react";
 import Sidebar from "../components/Sidebar";
 import AuthService from "../services/AuthService";
+import PageHeader from "../components/PageHeader";
+import PageFooter from "../components/PageFooter";
+import {
+  getStoredSidebarExpanded,
+  setStoredSidebarExpanded,
+} from "../utils/sidebarState";
 
 import ReportHeader from "../components/report/ReportHeader";
 import ReportFormSection from "../components/report/ReportFormSection";
@@ -13,7 +19,7 @@ class LostReportPage extends Component {
     this.state = {
       loading: false,
       error: null,
-      isSidebarExpanded: true,
+      isSidebarExpanded: getStoredSidebarExpanded(),
 
       formData: {
         nama_barang: "",
@@ -209,17 +215,37 @@ class LostReportPage extends Component {
     window.location.href = "/login";
   };
 
+  toggleSidebar = () => {
+    this.setState((prevState) => {
+      const isSidebarExpanded = !prevState.isSidebarExpanded;
+      setStoredSidebarExpanded(isSidebarExpanded);
+
+      return { isSidebarExpanded };
+    });
+  };
+
   render() {
     return (
-      <div className="flex min-h-screen bg-[#F5F7FB] ml-20 font-['Plus_Jakarta_Sans']">
+      <div className="flex min-h-screen bg-[#F5F7FB] font-['Plus_Jakarta_Sans']">
 
         <Sidebar
-          isSidebarExpanded={this.state.isSidebarExpanded}
+          expanded={this.state.isSidebarExpanded}
+          currentPath="/lapor-kehilangan"
           handleLogout={this.handleLogout}
           navigate={this.props.navigate}
         />
 
-        <main className="flex-1 px-4 py-4 overflow-y-auto max-w-7xl mx-auto">
+        <main
+          className={`
+            flex-1 px-4 py-4 overflow-y-auto max-w-7xl mx-auto
+            transition-[margin] duration-300
+            ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+          `}
+        >
+
+          <PageHeader
+            onToggleSidebar={this.toggleSidebar}
+          />
 
           <ReportHeader
             formData={this.state.formData}
@@ -241,6 +267,8 @@ class LostReportPage extends Component {
             validateForm={this.validateForm}
             handleSubmit={this.handleSubmit}
           />
+
+          <PageFooter />
 
         </main>
 

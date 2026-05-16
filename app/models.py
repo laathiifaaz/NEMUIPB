@@ -68,6 +68,22 @@ class KlaimBarang(Base):
     created_time = Column(TIMESTAMP, server_default=func.now())
     updated_time = Column(TIMESTAMP, onupdate=func.now())
 
+class SerahTerima(Base):
+    __tablename__ = "serah_terima"
+
+    serah_terima_id = Column(Integer, primary_key=True, index=True)
+
+    klaim_id = Column(Integer, ForeignKey("klaim_barang.klaim_id"))
+    barang_id = Column(Integer, ForeignKey("barang.barang_id"))
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+    admin_id = Column(Integer, ForeignKey("users.user_id"))
+
+    dokumen_text = Column(Text)
+    dokumen_hash = Column(Text)
+    digital_signature = Column(Text)
+    public_key = Column(Text)
+    created_at = Column(TIMESTAMP)
+
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
 

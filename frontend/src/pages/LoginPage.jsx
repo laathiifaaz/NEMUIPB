@@ -1,15 +1,56 @@
 import React, { Component } from 'react';
 import AuthService from '../services/AuthService';
 import ErrorModal from "../components/ErrorModal";
+import PageFooter from "../components/PageFooter";
+
+const REMEMBERED_USERNAME_KEY = "nemuipb_remembered_username";
 
 class LoginPage extends Component {
   constructor(props) {
     super(props);
-    this.state = { username: '', password: '', loading: false, showError: false, errorMessage: " " };
+
+    const rememberedUsername = this.getRememberedUsername();
+
+    this.state = {
+      username: rememberedUsername,
+      password: '',
+      rememberMe: rememberedUsername !== '',
+      loading: false,
+      showError: false,
+      errorMessage: " ",
+    };
   }
 
   handleChange = (e) => {
-    this.setState({ [e.target.name]: e.target.value });
+    const { name, type, checked, value } = e.target;
+
+    this.setState({
+      [name]: type === "checkbox" ? checked : value,
+    });
+  }
+
+  getRememberedUsername() {
+    try {
+      return localStorage.getItem(REMEMBERED_USERNAME_KEY) || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  saveRememberedUsername() {
+    try {
+      if (this.state.rememberMe) {
+        localStorage.setItem(
+          REMEMBERED_USERNAME_KEY,
+          this.state.username.trim()
+        );
+        return;
+      }
+
+      localStorage.removeItem(REMEMBERED_USERNAME_KEY);
+    } catch (error) {
+      // Login tetap berjalan walaupun browser storage tidak tersedia.
+    }
   }
 
     // Di dalam handleLogin di LoginPage.js
@@ -19,16 +60,15 @@ class LoginPage extends Component {
     this.setState({ loading: true, error: null });
 
     try {
-      const result = await AuthService.login(
+      await AuthService.login(
         this.state.username,
         this.state.password
       );
 
       // 🔥 ini HARUS dipanggil kalau sukses
-      this.props.onLoginSuccess();
+      this.saveRememberedUsername();
 
-      console.log("username:", this.state.username);
-      console.log("password:", this.state.password);
+      this.props.onLoginSuccess();
 
     } catch (err) {
       this.setState({ showError: true, errorMessage: err.message, });
@@ -108,6 +148,7 @@ class LoginPage extends Component {
                     <input 
                       name="username" 
                       type="text" 
+                      value={this.state.username}
                       onChange={this.handleChange}
                       className="w-full bg-gray-50 border border-gray-100 py-3 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition-all font-['Plus_Jakarta_Sans']"
                       placeholder="Username"
@@ -117,10 +158,9 @@ class LoginPage extends Component {
 
               {/* Input Password */}
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-semibold text-gray-600">Password</label>
-                  <a href="#" className="text-[10px] font-bold text-gray-400 hover:text-blue-900">Lupa kata sandi?</a>
-                </div>
+                <label className="text-sm font-semibold text-gray-600 block ml-1">
+                  Password
+                </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -128,7 +168,10 @@ class LoginPage extends Component {
                     </svg>
                   </span>
                   <input 
-                    name="password" type="password" onChange={this.handleChange}
+                    name="password"
+                    type="password"
+                    value={this.state.password}
+                    onChange={this.handleChange}
                     className="w-full bg-gray-50 border border-gray-100 py-3 pl-12 pr-4 rounded-xl focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                     placeholder="••••••••"
                   />
@@ -137,8 +180,20 @@ class LoginPage extends Component {
 
               {/* Remember Me */}
               <div className="flex items-center gap-2">
-                <input type="checkbox" className="rounded border-gray-300 text-blue-900 focus:ring-blue-900" />
-                <label className="text-sm text-gray-400 font-medium">Remember me</label>
+                <input
+                  id="rememberMe"
+                  name="rememberMe"
+                  type="checkbox"
+                  checked={this.state.rememberMe}
+                  onChange={this.handleChange}
+                  className="rounded border-gray-300 text-blue-900 focus:ring-blue-900"
+                />
+                <label
+                  htmlFor="rememberMe"
+                  className="text-sm text-gray-400 font-medium cursor-pointer"
+                >
+                  Remember me
+                </label>
               </div>
 
               {/* Submit Button */}
@@ -161,10 +216,7 @@ class LoginPage extends Component {
             </form>
           </div>
 
-          {/* Footer Copyright */}
-          <div className="text-center text-[10px] font-medium text-gray-400 mt-auto">
-            © 2026 IPB University. All rights reserved.
-          </div>
+          <PageFooter className="mt-auto justify-center" />
         </div>
 
       <ErrorModal

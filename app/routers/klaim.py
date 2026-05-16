@@ -4,6 +4,7 @@ from app.utils.security import get_current_user
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan, KlaimBarang
 from app.schemas import KlaimCreate, VerifikasiKlaim
+from app.services.serah_terima_service import create_serah_terima
 
 router = APIRouter(tags=["Klaim"])
 
@@ -39,16 +40,29 @@ def klaim_barang(
             detail="Barang tidak ditemukan"
         )
 
-    duplikat = db.query(KlaimBarang).filter(
+    duplikat_barang = db.query(KlaimBarang).filter(
         KlaimBarang.user_id == current_user.user_id,
         KlaimBarang.barang_id == barang_id
     ).first()
 
-    if duplikat:
+    if duplikat_barang:
         db.close()
         raise HTTPException(
             status_code=400,
             detail="Anda sudah pernah mengklaim barang ini"
+        )
+
+    laporan_sedang_dipakai = db.query(KlaimBarang).filter(
+        KlaimBarang.user_id == current_user.user_id,
+        KlaimBarang.laporan_kehilangan_id == data.laporan_kehilangan_id,
+        KlaimBarang.status_klaim.in_(["diproses", "diterima"])
+    ).first()
+
+    if laporan_sedang_dipakai:
+        db.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Laporan kehilangan ini sedang dipakai atau sudah diterima untuk klaim lain"
         )
 
     klaim_baru = KlaimBarang(
@@ -114,6 +128,13 @@ def verifikasi_klaim(
 
         if barang:
             barang.status_barang = "selesai"
+
+            create_serah_terima(
+            db=db,
+            klaim=klaim,
+            barang=barang,
+            admin=current_user
+            )
 
     db.commit()
     db.close()
