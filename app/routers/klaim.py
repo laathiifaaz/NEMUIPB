@@ -4,6 +4,7 @@ from app.utils.security import get_current_user
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan, KlaimBarang
 from app.schemas import KlaimCreate, VerifikasiKlaim
+from app.services.encryption.EncryptionService import encryption_service
 from app.services.serah_terima_service import create_serah_terima
 
 router = APIRouter(tags=["Klaim"])
@@ -119,7 +120,8 @@ def verifikasi_klaim(
         )
 
     klaim.status_klaim = data.status_klaim
-    klaim.catatan_admin = data.catatan_admin
+    # Claim admin notes are sensitive and are encrypted before persistence.
+    klaim.catatan_admin = encryption_service.encrypt_if_exists(data.catatan_admin)
 
     if data.status_klaim == "diterima":
         barang = db.query(Barang).filter(

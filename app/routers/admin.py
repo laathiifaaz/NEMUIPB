@@ -1,11 +1,17 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.utils.security import get_current_user
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import case
 
 from app.database import SessionLocal
-from app.models import User, Barang, Laporan, Notifikasi, KlaimBarang, ActivityLog
+from app.models import User, Barang, Laporan, Notifikasi, KlaimBarang
 from app.schemas import VerifikasiLaporan, UpdateStatusBarang, VerifikasiKlaim
+from app.services.admin_activity_service import (
+    create_activity_log,
+    export_activity_logs as export_activity_logs_service,
+    get_activity_logs as get_activity_logs_service
+)
+from app.services.encryption.EncryptionService import encryption_service
 
 router = APIRouter(
     prefix="/admin",
@@ -19,26 +25,6 @@ def ensure_admin(current_user: User):
             detail="Akses ditolak. User bukan admin"
         )
     
-def create_activity_log(
-    db,
-    action_type: str,
-    note: str,
-    admin_id: int = None,
-    barang_id: int = None,
-    laporan_id: int = None,
-    klaim_id: int = None
-):
-    log = ActivityLog(
-        action_type=action_type,
-        note=note,
-        admin_id=admin_id,
-        barang_id=barang_id,
-        laporan_id=laporan_id,
-        klaim_id=klaim_id
-    )
-
-    db.add(log)
-
 @router.get("/laporan")
 def get_all_laporan(
     current_user: User = Depends(get_current_user)
@@ -90,9 +76,14 @@ def get_recent_laporan(
     if status_verifikasi != "semua":
         query = query.filter(Laporan.status_verifikasi == status_verifikasi)
 
+    verification_priority = case(
+        (Laporan.status_verifikasi == "belum_diverifikasi", 0),
+        else_=1
+    )
+
     data = (
         query
-        .order_by(Laporan.laporan_id.desc())
+        .order_by(verification_priority, Laporan.laporan_id.desc())
         .limit(10)
         .all()
     )
@@ -181,7 +172,8 @@ def setujui_laporan(
     laporan.verified_by = current_user.user_id
     laporan.status_laporan = "disetujui"
     laporan.status_verifikasi = "terverifikasi"
-    laporan.catatan_verifikasi = data.catatan_verifikasi
+    # Admin verification notes are sensitive and are encrypted before persistence.
+    laporan.catatan_verifikasi = encryption_service.encrypt_if_exists(data.catatan_verifikasi)
     laporan.tanggal_verifikasi = datetime.now()
 
     db.commit()
@@ -232,7 +224,8 @@ def tolak_laporan(
     laporan.verified_by = current_user.user_id
     laporan.status_laporan = "ditolak"
     laporan.status_verifikasi = "ditolak"
-    laporan.catatan_verifikasi = data.catatan_verifikasi
+    # Admin verification notes are sensitive and are encrypted before persistence.
+    laporan.catatan_verifikasi = encryption_service.encrypt_if_exists(data.catatan_verifikasi)
     laporan.tanggal_verifikasi = datetime.now()
 
     db.commit()
@@ -429,34 +422,7 @@ def get_activity_logs(
 
     db = SessionLocal()
 
-    query = (
-        db.query(ActivityLog, Barang, User)
-        .outerjoin(Barang, ActivityLog.barang_id == Barang.barang_id)
-        .outerjoin(User, ActivityLog.admin_id == User.user_id)
-    )
-
-    if action_type != "semua":
-        query = query.filter(ActivityLog.action_type == action_type)
-
-    if sort_by == "oldest":
-        query = query.order_by(ActivityLog.created_at.asc())
-    else:
-        query = query.order_by(ActivityLog.created_at.desc())
-
-    data = query.limit(25).all()
-
-    result = []
-
-    for log, barang, admin in data:
-        result.append({
-            "log_id": log.log_id,
-            "timestamp": log.created_at,
-            "item_id": f"#IPB-{barang.barang_id}" if barang else None,
-            "item_name": barang.nama_barang if barang else None,
-            "action_type": log.action_type,
-            "administrator": admin.nama if admin else "System",
-            "note": log.note
-        })
+    result = get_activity_logs_service(db, action_type, sort_by)
 
     db.close()
 
@@ -470,26 +436,7 @@ def export_activity_logs(
 
     db = SessionLocal()
 
-    data = (
-        db.query(ActivityLog, Barang, User)
-        .outerjoin(Barang, ActivityLog.barang_id == Barang.barang_id)
-        .outerjoin(User, ActivityLog.admin_id == User.user_id)
-        .order_by(ActivityLog.created_at.desc())
-        .all()
-    )
-
-    result = []
-
-    for log, barang, admin in data:
-        result.append({
-            "log_id": log.log_id,
-            "timestamp": log.created_at,
-            "item_id": f"#IPB-{barang.barang_id}" if barang else None,
-            "item_name": barang.nama_barang if barang else None,
-            "action_type": log.action_type,
-            "administrator": admin.nama if admin else "System",
-            "note": log.note
-        })
+    result = export_activity_logs_service(db)
 
     db.close()
 

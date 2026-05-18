@@ -3,6 +3,7 @@ from app.utils.security import get_current_user
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan
 from app.schemas import LaporanCreate
+from app.services.encryption.EncryptionService import encryption_service
 
 router = APIRouter(
     prefix="/laporan",
@@ -208,7 +209,7 @@ def get_detail_laporan(laporan_id: int):
         "jenis_laporan": laporan.jenis_laporan,
         "status_laporan": laporan.status_laporan,
         "status_verifikasi": laporan.status_verifikasi,
-        "catatan_verifikasi": laporan.catatan_verifikasi,
+        "catatan_verifikasi": encryption_service.decrypt_if_exists(laporan.catatan_verifikasi),
         "tanggal_verifikasi": laporan.tanggal_verifikasi,
         "barang": {
             "barang_id": barang.barang_id,

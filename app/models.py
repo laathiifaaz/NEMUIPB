@@ -96,4 +96,4 @@ class ActivityLog(Base):
 
     action_type = Column(String)
     note = Column(Text)
-    created_at = Column(TIMESTAMP)
+    created_at = Column(TIMESTAMP, server_default=func.now())
