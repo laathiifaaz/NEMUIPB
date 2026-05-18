@@ -5,8 +5,8 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import LostReportPage from "./pages/LostReportPage";
 import VerificationReportPage from "./pages/VerificationReportPage";
 import AdminBarangPage from "./pages/AdminBarangPage";
+import KoleksiBarangPage from "./pages/KoleksiBarangPage";
 import AuthService from "./services/AuthService";
-
 
 class App extends Component {
   constructor(props) {
@@ -21,10 +21,6 @@ class App extends Component {
   componentDidMount() {
     const token = AuthService.getToken();
 
-    this.setState({
-      loading: true,
-    });
-
     if (token) {
       fetch("http://127.0.0.1:8000/auth/me", {
         headers: {
@@ -34,12 +30,18 @@ class App extends Component {
         .then((res) => {
           if (!res.ok) {
             AuthService.logout();
-            this.setState({ isLoggedIn: false });
+
+            this.setState({
+              isLoggedIn: false,
+            });
           }
         })
         .catch(() => {
           AuthService.logout();
-          this.setState({ isLoggedIn: false });
+
+          this.setState({
+            isLoggedIn: false,
+          });
         });
     }
   }
@@ -65,11 +67,10 @@ class App extends Component {
   };
 
   navigate = (path) => {
-
     window.history.pushState({}, "", path);
 
     this.setState({
-      currentPath: window.location.pathname,
+      currentPath: path,
     });
   };
 
@@ -81,6 +82,20 @@ class App extends Component {
       return <LoginPage onLoginSuccess={this.handleLoginSuccess} />;
     }
 
+    // Dashboard utama
+    if (
+      currentPath === "/" ||
+      currentPath === "/dashboard"
+    ) {
+      return <DashboardPage navigate={this.navigate} />;
+    }
+
+    // Koleksi barang
+    if (currentPath === "/koleksi") {
+      return <KoleksiBarangPage navigate={this.navigate} />;
+    }
+
+    // Admin dashboard
     if (currentPath === "/admin") {
       if (user.role !== "admin") {
         return <DashboardPage navigate={this.navigate} />;
@@ -89,6 +104,7 @@ class App extends Component {
       return <AdminDashboardPage navigate={this.navigate} />;
     }
 
+    // Verifikasi laporan
     if (currentPath === "/verifikasi") {
       return (
         <VerificationReportPage
@@ -98,6 +114,7 @@ class App extends Component {
       );
     }
 
+    // Lapor kehilangan
     if (currentPath === "/lapor-kehilangan") {
       return (
         <LostReportPage
@@ -107,6 +124,7 @@ class App extends Component {
       );
     }
 
+    // Admin barang
     if (currentPath === "/admin/barang") {
       if (user.role !== "admin") {
         return <DashboardPage navigate={this.navigate} />;
@@ -115,6 +133,7 @@ class App extends Component {
       return <AdminBarangPage navigate={this.navigate} />;
     }
 
+    // fallback
     return <DashboardPage navigate={this.navigate} />;
   }
 
