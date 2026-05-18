@@ -1,7 +1,12 @@
 import React, { Component } from "react";
-import AuthService from "../services/AuthService";
 import Sidebar from "../components/Sidebar";
 import ReportService from "../services/ReportService";
+import PageHeader from "../components/PageHeader";
+import PageFooter from "../components/PageFooter";
+import {
+  getStoredSidebarExpanded,
+  setStoredSidebarExpanded,
+} from "../utils/sidebarState";
 
 class VerificationReportPage extends Component {
   constructor(props) {
@@ -12,12 +17,22 @@ class VerificationReportPage extends Component {
       selectedReport: null,
       loading: true,
       searchQuery: "",
+      isSidebarExpanded: getStoredSidebarExpanded(),
     };
   }
 
     handleSearch = (e) => {
     this.setState({
       searchQuery: e.target.value,
+    });
+  };
+
+  toggleSidebar = () => {
+    this.setState((prevState) => {
+      const isSidebarExpanded = !prevState.isSidebarExpanded;
+      setStoredSidebarExpanded(isSidebarExpanded);
+
+      return { isSidebarExpanded };
     });
   };
 
@@ -155,15 +170,6 @@ class VerificationReportPage extends Component {
   });
 
 
-    if (loading) {
-  return (
-    <div className="p-10">
-      Loading...
-    </div>
-  );
-}
-
-
     return (
       <div className="flex min-h-screen bg-[#F5F7FB]">
 
@@ -172,10 +178,21 @@ class VerificationReportPage extends Component {
           navigate={this.props.navigate}
           currentPath="/verifikasi"
           handleLogout={this.props.handleLogout}
+          expanded={this.state.isSidebarExpanded}
         />
 
         {/* MAIN */}
-        <div className="ml-20 flex-1 px-8 py-7">
+        <div
+          className={`
+            flex-1 px-8 py-7
+            transition-[margin] duration-300
+            ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+          `}
+        >
+
+          <PageHeader
+            onToggleSidebar={this.toggleSidebar}
+          />
 
           {/* HEADER */}
           <div className="mb-7">
@@ -259,7 +276,6 @@ class VerificationReportPage extends Component {
                   
 
                   filteredReports.map((report) => (
-                        console.log(Object.keys(report)),
                     <div
                       key={report.laporan_id}
 
@@ -993,6 +1009,8 @@ class VerificationReportPage extends Component {
 
             </div>
           )}
+
+          <PageFooter />
 
         </div>
       </div>

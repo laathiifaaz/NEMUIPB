@@ -2,6 +2,12 @@ import React, { Component } from "react";
 import AuthService from "../services/AuthService";
 import AdminService from "../services/AdminService";
 import AdminSidebar from "../components/admin/AdminSidebar";
+import PageHeader from "../components/PageHeader";
+import PageFooter from "../components/PageFooter";
+import {
+  getStoredSidebarExpanded,
+  setStoredSidebarExpanded,
+} from "../utils/sidebarState";
 
 class AdminDashboardPage extends Component {
   constructor(props) {
@@ -27,7 +33,7 @@ class AdminDashboardPage extends Component {
       showFilterMenu: false,
       isLoading: true,
       error: null,
-      isSidebarExpanded: true,
+      isSidebarExpanded: getStoredSidebarExpanded(),
     };
   }
 
@@ -44,8 +50,11 @@ class AdminDashboardPage extends Component {
   }
 
   toggleSidebar = () => {
-    this.setState({
-      isSidebarExpanded: !this.state.isSidebarExpanded,
+    this.setState((prevState) => {
+      const isSidebarExpanded = !prevState.isSidebarExpanded;
+      setStoredSidebarExpanded(isSidebarExpanded);
+
+      return { isSidebarExpanded };
     });
   };
 
@@ -296,11 +305,12 @@ class AdminDashboardPage extends Component {
     const isDisabled = this.isFinalStatus(report);
 
     return (
-      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-6">
-        <div className="bg-white rounded-[30px] w-full max-w-5xl p-6 relative">
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-6">
+        <div className="bg-white rounded-[24px] w-full max-w-5xl p-5 md:p-6 relative max-h-[90vh] overflow-y-auto">
           <button
+            type="button"
             onClick={this.handleCloseDetail}
-            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600"
+            className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
           >
             <i className="fas fa-times"></i>
           </button>
@@ -324,7 +334,7 @@ class AdminDashboardPage extends Component {
               </div>
             </div>
 
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 md:pr-12">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <p className="text-[#9A7D0A] text-xs font-black uppercase tracking-widest">
@@ -408,35 +418,43 @@ class AdminDashboardPage extends Component {
   const isDeny = confirmModal.type === "deny";
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center px-6">
-      <div className="bg-white rounded-[24px] w-full max-w-xl px-10 py-10 text-center shadow-2xl">
-        <div className="mx-auto mb-5 w-0 h-0 border-l-[38px] border-l-transparent border-r-[38px] border-r-transparent border-b-[66px] border-b-[#FFD75A] relative">
-          <span className="absolute -left-[9px] top-5 text-white text-4xl font-black">
-            ?
-          </span>
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center px-4 py-6">
+      <div className="bg-white rounded-[20px] w-full max-w-sm px-6 pt-9 pb-6 text-center shadow-2xl relative">
+        <button
+          type="button"
+          onClick={this.closeConfirmModal}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+        >
+          <i className="fas fa-times text-sm"></i>
+        </button>
+
+        <div className="mx-auto mb-4 w-12 h-12 rounded-2xl bg-[#FFD75A] text-white flex items-center justify-center text-2xl font-black">
+          ?
         </div>
 
-        <h2 className="text-3xl font-extrabold text-black mb-4">
+        <h2 className="text-2xl font-extrabold text-black mb-3">
           {isDeny ? "Tolak Laporan?" : "Verifikasi Laporan?"}
         </h2>
 
-        <p className="text-gray-500 text-lg mb-10">
+        <p className="text-gray-500 text-sm leading-relaxed mb-6">
           {isDeny
             ? "Laporan yang ditolak tidak dapat diubah."
             : "Laporan yang disetujui tidak dapat diubah."}
         </p>
 
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-2 gap-3">
           <button
+            type="button"
             onClick={this.closeConfirmModal}
-            className="py-4 rounded-xl bg-[#E8EEF5] text-[#002B5B] font-extrabold text-lg"
+            className="py-3 rounded-xl bg-[#E8EEF5] text-[#002B5B] font-extrabold text-sm"
           >
             Tidak
           </button>
 
           <button
+            type="button"
             onClick={this.handleConfirmAction}
-            className={`py-4 rounded-xl text-white font-extrabold text-lg ${
+            className={`py-3 rounded-xl text-white font-extrabold text-sm ${
               isDeny ? "bg-[#C9181F]" : "bg-[#002B5B]"
             }`}
           >
@@ -460,34 +478,27 @@ class AdminDashboardPage extends Component {
             navigate={this.props.navigate}
           />
 
-          <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-            <header className="bg-white rounded-2xl px-8 py-5 flex items-center justify-between mb-8 shadow-sm">
-                <div className="flex items-center gap-4">
-                    <button
-                    onClick={this.toggleSidebar}
-                    className="text-[#002B5B] hover:bg-gray-100 p-2 rounded-lg transition-colors"
-                    >
-                    <i className="fas fa-bars text-2xl"></i>
-                    </button>
-
-                    <h1 className="font-extrabold text-[#002B5B] text-xl">
-                    NEMUIPB
-                    </h1>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <button
-                    onClick={this.goToUserMode}
-                    className="bg-[#002B5B] text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#001f42] transition-all"
-                    >
-                    User Mode
-                    </button>
-
-                    <div className="w-11 h-11 bg-[#002B5B]/10 rounded-xl flex items-center justify-center">
-                    <i className="fas fa-user-shield text-[#002B5B]"></i>
-                    </div>
-                </div>
-                </header>
+          <main
+            className={`
+              flex-1 p-6 md:p-10 overflow-y-auto
+              transition-[margin] duration-300
+              ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+            `}
+          >
+            <PageHeader
+              onToggleSidebar={this.toggleSidebar}
+              profileIcon="fa-user-shield"
+              actions={
+                <button
+                  type="button"
+                  onClick={this.goToUserMode}
+                  className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
+                >
+                  <i className="fas fa-user mr-2"></i>
+                  Mode User
+                </button>
+              }
+            />
 
             {error && (
               <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 text-sm font-bold">
@@ -717,15 +728,12 @@ class AdminDashboardPage extends Component {
                   </table>
                 </div>
               )}
-                {this.renderDetailModal()}
-                {this.renderConfirmModal()}
-
               <div className="flex justify-between items-center mt-8 text-xs text-gray-500">
                 <p>Showing {reports.length} reports</p>
               </div>
             </section>
 
-            {this.renderDetailModal()}
+            <PageFooter />
           </main>
             {this.renderDetailModal()}
             {this.renderConfirmModal()}

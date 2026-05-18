@@ -7,21 +7,57 @@ class AdminSidebar extends Component {
     window.location.href = "/";
   };
 
+  handleNavigate(path) {
+    const { navigate } = this.props;
+
+    if (navigate) {
+      navigate(path);
+    }
+  }
+
   renderItem(icon, label, activeKey, path) {
-    const { activeMenu, expanded, navigate } = this.props;
+    const { activeMenu, expanded } = this.props;
     const isActive = activeMenu === activeKey;
 
     return (
       <div
-        onClick={() => navigate && navigate(path)}
-        className={`flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-all ${
+        onClick={() => this.handleNavigate(path)}
+        className={`
+          flex
+          items-center
+          justify-between
+          h-14
+          px-4
+          rounded-2xl
+          cursor-pointer
+          relative
+          overflow-hidden
+          transition-colors duration-200
+          ${
           isActive
-            ? "bg-white text-[#002B5B] font-extrabold shadow-sm"
-            : "text-[#4B5F7A] hover:bg-white hover:text-[#002B5B]"
-        } ${!expanded && "justify-center px-0"}`}
+            ? "bg-[#163A70] text-white shadow-md shadow-blue-100"
+            : "text-gray-400 hover:bg-gray-50 hover:text-[#002B5B]"
+          }
+        `}
       >
-        <i className={`fas ${icon} text-lg w-6 text-center`}></i>
-        {expanded && <span className="text-sm font-bold">{label}</span>}
+        <div className="flex items-center">
+          <div className="w-4 flex justify-center flex-shrink-0">
+            <i className={`fas ${icon}`}></i>
+          </div>
+
+          <span
+            className={`
+              ml-4
+              font-bold
+              text-sm
+              whitespace-nowrap
+              ${expanded ? "opacity-100" : "opacity-0"}
+              transition-opacity duration-150
+            `}
+          >
+            {label}
+          </span>
+        </div>
       </div>
     );
   }
@@ -31,33 +67,47 @@ class AdminSidebar extends Component {
 
     return (
       <aside
-        className={`${
-          expanded ? "w-72 px-6" : "w-24 px-4"
-        } min-h-screen bg-[#F3F7FB] border-r border-gray-100 flex flex-col py-8 transition-all duration-300 hidden md:flex`}
+        aria-hidden={!expanded}
+        className={`
+          fixed
+          top-0
+          left-0
+          h-screen
+          z-50
+          ${expanded ? "w-64 px-4" : "w-0 px-0"}
+          bg-[#F8FAFC]
+          ${expanded ? "border-r" : "border-r-0"}
+          border-gray-100
+          flex
+          flex-col
+          py-8
+          shadow-sm
+          overflow-x-hidden
+          ${expanded ? "pointer-events-auto" : "pointer-events-none"}
+          transition-[width,padding] duration-300
+        `}
       >
-        <div
-          className={`flex items-center gap-4 mb-10 ${
-            !expanded && "justify-center"
-          }`}
-        >
-          <div className="min-w-[48px] h-12 bg-[#002B5B] rounded-xl flex items-center justify-center shadow-lg">
-            <img
-              src="/assets/images/logo-ipb.png"
-              alt="Logo"
-              className="w-8 h-8 object-contain invert"
-            />
-          </div>
+        <div className="flex items-center gap-4 mb-12 px-2">
+          <img
+            src="/images/logo-nemuipb.png"
+            alt="Logo"
+            className="w-12 h-12 object-contain transition-all duration-300 flex-shrink-0"
+          />
 
-          {expanded && (
-            <div className="truncate">
-              <h1 className="font-extrabold text-[#002B5B] text-lg leading-none">
-                NEMU IPB
-              </h1>
-              <p className="text-[10px] text-gray-400 font-bold">
-                IPB LOST & FOUND
-              </p>
-            </div>
-          )}
+          <div
+            className={`
+              truncate
+              transition-opacity duration-200
+              ${expanded ? "opacity-100" : "opacity-0"}
+            `}
+          >
+            <h1 className="font-bold text-[#002B5B] text-lg leading-none">
+              NEMU IPB
+            </h1>
+            <p className="text-[10px] text-gray-400 font-bold tracking-tight">
+              IPB LOST & FOUND
+            </p>
+          </div>
         </div>
 
         <nav className="flex flex-col gap-2">
@@ -68,24 +118,42 @@ class AdminSidebar extends Component {
           {this.renderItem("fa-users", "User Management", "users", "/admin")}
         </nav>
 
-        <div className="mt-auto border-t border-gray-200 pt-6 flex flex-col gap-4">
+        <div className="mt-auto flex flex-col gap-2">
           <div
-            className={`flex items-center gap-4 px-4 py-3 text-[#4B5F7A] ${
-              !expanded && "justify-center px-0"
-            }`}
+            className="flex items-center h-12 px-4 text-gray-400 hover:text-[#002B5B] cursor-pointer"
           >
-            <i className="far fa-question-circle text-lg w-6 text-center"></i>
-            {expanded && <span className="text-sm font-bold">Panduan</span>}
+            <div className="w-4 flex justify-center flex-shrink-0">
+              <i className="far fa-question-circle text-xl"></i>
+            </div>
+
+            <span
+              className={`
+                font-bold text-sm ml-3
+                transition-opacity duration-200
+                ${expanded ? "opacity-100" : "opacity-0"}
+              `}
+            >
+              Panduan
+            </span>
           </div>
 
           <button
             onClick={this.handleLogout}
-            className={`bg-[#002B5B] text-white py-3 rounded-xl text-sm font-bold hover:bg-red-700 transition-all ${
-              !expanded && "px-0"
-            }`}
+            className="flex items-center h-12 w-full px-4 bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors"
           >
-            <i className="fas fa-sign-out-alt"></i>
-            {expanded && <span className="ml-2">Keluar</span>}
+            <div className="w-4 flex justify-center flex-shrink-0">
+              <i className="fas fa-sign-out-alt text-[14px]"></i>
+            </div>
+
+            <span
+              className={`
+                font-bold text-sm ml-3
+                transition-opacity duration-200
+                ${expanded ? "opacity-100" : "opacity-0"}
+              `}
+            >
+              Keluar
+            </span>
           </button>
         </div>
       </aside>
