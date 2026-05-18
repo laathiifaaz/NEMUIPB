@@ -176,11 +176,14 @@ class Sidebar extends Component {
           </div>
 
           {/* KOLEKSI */}
-          <SidebarItem
-            icon="fa-box"
-            label="Koleksi Barang"
-            expanded={expanded}
-          />
+          <div onClick={() => this.handleNavigate("/koleksi")}>
+            <SidebarItem
+              icon="fa-box"
+              label="Koleksi Barang"
+              expanded={expanded}
+              active={currentPath === "/koleksi"}
+            />
+          </div>
 
           {/* VERIFIKASI */}
           <div onClick={() => this.handleNavigate("/verifikasi")}>

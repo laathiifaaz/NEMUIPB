@@ -7,6 +7,7 @@ import {
   getStoredSidebarExpanded,
   setStoredSidebarExpanded,
 } from "../utils/sidebarState";
+import { API_BASE_URL } from "../config/api";
 
 import ReportHeader from "../components/report/ReportHeader";
 import ReportFormSection from "../components/report/ReportFormSection";
@@ -181,7 +182,7 @@ class LostReportPage extends Component {
       };
 
       const response = await fetch(
-        "http://127.0.0.1:8000/laporan/kehilangan",
+        `${API_BASE_URL}/laporan/kehilangan`,
         {
           method: "POST",
 

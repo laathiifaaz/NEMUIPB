@@ -53,7 +53,7 @@ class LoginPage extends Component {
     }
   }
 
-    // Di dalam handleLogin di LoginPage.js
+    // Di dalam handleLogin di LoginPage.jsx
   handleLogin = async (e) => {
     e.preventDefault();
 

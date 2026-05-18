@@ -1,8 +1,9 @@
 import AuthService from "./AuthService";
+import { API_BASE_URL } from "../config/api";
 
 class ApiService {
   constructor() {
-    this.baseUrl = "http://127.0.0.1:8000";
+    this.baseUrl = API_BASE_URL;
   }
 
   getAuthHeaders() {

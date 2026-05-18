@@ -1,4 +1,4 @@
-// src/pages/DashboardPage.js
+// src/pages/DashboardPage.jsx
 
 import React, { Component } from 'react';
 import AuthService from '../services/AuthService';

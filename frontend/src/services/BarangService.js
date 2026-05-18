@@ -20,7 +20,13 @@ class BarangService extends ApiService {
   }
 
   async filterBarang(params) {
-    const query = new URLSearchParams(params).toString();
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, value]) => {
+        return value !== undefined && value !== null && value !== "";
+      })
+    );
+
+    const query = new URLSearchParams(cleanParams).toString();
 
     const res = await fetch(`${this.baseUrl}/barang/filter?${query}`);
 
@@ -40,4 +46,6 @@ class BarangService extends ApiService {
   }
 }
 
-export default new BarangService();
+const barangService = new BarangService();
+
+export default barangService;

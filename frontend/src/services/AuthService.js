@@ -1,14 +1,19 @@
+import { API_BASE_URL } from "../config/api";
+
 class AuthService {
 
   constructor() {
     // Pastikan ini sesuai dengan port FastAPI kamu (8000)
-    this.baseUrl = "http://127.0.0.1:8000";
+    this.baseUrl = API_BASE_URL;
   }
 
   async login(username, password) {
+    const normalizedUsername = username
+      .trim()
+      .replace(/@apps\.ipb\.ac\.id$/i, "");
 
     const response = await fetch(
-      `${this.baseUrl}/login`,
+      `${this.baseUrl}/auth/login`,
       {
         method: "POST",
 
@@ -17,7 +22,7 @@ class AuthService {
         },
 
         body: JSON.stringify({
-          username,
+          username: normalizedUsername,
           password,
         }),
       }

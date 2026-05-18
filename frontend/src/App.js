@@ -1,11 +1,11 @@
 import React, { Component } from "react";
-import LoginPage from "./pages/LoginPage";
-import DashboardPage from "./pages/DashboardPage";
-import AdminDashboardPage from "./pages/AdminDashboardPage";
-import LostReportPage from "./pages/LostReportPage";
-import VerificationReportPage from "./pages/VerificationReportPage";
-import AdminBarangPage from "./pages/AdminBarangPage";
-import KoleksiBarangPage from "./pages/KoleksiBarangPage";
+import LoginPage from "./pages/LoginPage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
+import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
+import LostReportPage from "./pages/LostReportPage.jsx";
+import VerificationReportPage from "./pages/VerificationReportPage.jsx";
+import AdminBarangPage from "./pages/AdminBarangPage.jsx";
+import KoleksiBarangPage from "./pages/KoleksiBarangPage.js";
 import AuthService from "./services/AuthService";
 
 class App extends Component {
@@ -16,34 +16,6 @@ class App extends Component {
       isLoggedIn: AuthService.isLoggedIn(),
       currentPath: window.location.pathname,
     };
-  }
-
-  componentDidMount() {
-    const token = AuthService.getToken();
-
-    if (token) {
-      fetch("http://127.0.0.1:8000/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-        .then((res) => {
-          if (!res.ok) {
-            AuthService.logout();
-
-            this.setState({
-              isLoggedIn: false,
-            });
-          }
-        })
-        .catch(() => {
-          AuthService.logout();
-
-          this.setState({
-            isLoggedIn: false,
-          });
-        });
-    }
   }
 
   handleLoginSuccess = () => {

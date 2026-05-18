@@ -1,9 +1,10 @@
 import AuthService from "./AuthService";
+import { API_BASE_URL } from "../config/api";
 
 class ReportService {
 
   constructor() {
-    this.baseUrl = "http://127.0.0.1:8000";
+    this.baseUrl = API_BASE_URL;
   }
 
   async getMyReports() {
@@ -11,7 +12,7 @@ class ReportService {
     try {
 
       const response = await fetch(
-        "http://127.0.0.1:8000/laporan/kehilangan/me",
+        `${this.baseUrl}/laporan/kehilangan/me`,
         {
           method: "GET",
 
@@ -45,7 +46,7 @@ class ReportService {
     try {
 
       const response = await fetch(
-        "http://127.0.0.1:8000/laporan/kehilangan",
+        `${this.baseUrl}/laporan/kehilangan`,
         {
           method: "POST",
 
@@ -75,4 +76,6 @@ class ReportService {
   }
 }
 
-export default new ReportService();
+const reportService = new ReportService();
+
+export default reportService;
