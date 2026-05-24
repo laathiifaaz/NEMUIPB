@@ -2,6 +2,7 @@ import React from "react";
 import DatePicker from "../DatePicker";
 
 const ReportFormSection = ({
+  reportType,
   formData,
   errors,
   selectedImage,
@@ -14,40 +15,38 @@ const ReportFormSection = ({
   validateForm,
   handleSubmit,
 }) => {
+
+const isPenemuan = reportType === "penemuan";
+
   return (
     <>
-
       {/* DETAIL BARANG */}
       <section
         ref={sectionRefs.detail}
         className="bg-white rounded-[24px] border border-[#E7ECF3] p-8 mb-6 shadow-sm"
       >
-
         <div className="flex items-start gap-4 mb-8">
-
           <div className="w-12 h-12 rounded-2xl bg-[#EDF4FF] flex items-center justify-center text-[#1B4D9B]">
             <i className="fas fa-box text-lg"></i>
           </div>
 
           <div>
-
             <h2 className="text-xl font-bold text-[#102348] mb-1">
               Detail Barang
             </h2>
 
             <p className="text-sm text-gray-500">
-              Informasi penting tentang barang yang hilang.
+              {isPenemuan
+                ? "Informasi penting tentang barang yang ditemukan."
+                : "Informasi penting tentang barang yang hilang."}
             </p>
-
           </div>
-
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 
           {/* NAMA BARANG */}
           <div>
-
             <label className="font-semibold text-[#102348]">
               Nama Barang <span className="text-red-500">*</span>
             </label>
@@ -82,12 +81,10 @@ const ReportFormSection = ({
                 Wajib diisi
               </p>
             )}
-
           </div>
 
           {/* KATEGORI */}
           <div>
-
             <label className="font-semibold text-[#102348]">
               Kategori <span className="text-red-500">*</span>
             </label>
@@ -114,7 +111,6 @@ const ReportFormSection = ({
                 }
               `}
             >
-
               <option value="">
                 Pilih kategori
               </option>
@@ -123,18 +119,21 @@ const ReportFormSection = ({
                 Elektronik
               </option>
 
+              <option value="Pakaian">
+                Pakaian
+              </option>
+
               <option value="Aksesoris">
                 Aksesoris
               </option>
 
-              <option value="Dokumen">
-                Dokumen
+              <option value="Alat Tulis">
+                Alat Tulis
               </option>
 
               <option value="Lainnya">
                 Lainnya
               </option>
-
             </select>
 
             {errors.kategori && (
@@ -142,14 +141,11 @@ const ReportFormSection = ({
                 Wajib diisi
               </p>
             )}
-
           </div>
-
         </div>
 
         {/* DESKRIPSI */}
         <div>
-
           <label className="font-semibold text-[#102348]">
             Deskripsi Barang <span className="text-red-500">*</span>
           </label>
@@ -160,7 +156,11 @@ const ReportFormSection = ({
             value={formData.deskripsi}
             onChange={handleChange}
             rows="5"
-            placeholder="Jelaskan ciri-ciri barang..."
+            placeholder={
+              isPenemuan
+                ? "Jelaskan ciri-ciri barang yang ditemukan..."
+                : "Jelaskan ciri-ciri barang yang hilang..."
+            }
             className={`
               w-full
               rounded-xl
@@ -184,9 +184,7 @@ const ReportFormSection = ({
               Wajib diisi
             </p>
           )}
-
         </div>
-
       </section>
 
       {/* LOKASI */}
@@ -204,11 +202,15 @@ const ReportFormSection = ({
           <div>
 
             <h2 className="text-xl font-bold text-[#102348] mb-1">
-              Lokasi & Waktu
+              {isPenemuan
+                ? "Lokasi & Tanggal Penemuan"
+                : "Lokasi & Tanggal Kehilangan"}
             </h2>
 
             <p className="text-sm text-gray-500">
-              Bantu kami menentukan dimana dan kapan ditemukan.
+              {isPenemuan
+                ? "Bantu kami menentukan dimana dan kapan barang ditemukan."
+                : "Bantu kami menentukan dimana dan kapan barang hilang."}
             </p>
 
           </div>
@@ -221,7 +223,10 @@ const ReportFormSection = ({
           <div>
 
             <label className="font-semibold text-[#102348]">
-              Lokasi Kehilangan <span className="text-red-500">*</span>
+              {isPenemuan
+                ? "Lokasi Penemuan"
+                : "Lokasi Kehilangan"}{" "}
+              <span className="text-red-500">*</span>
             </label>
 
             <input
@@ -230,7 +235,11 @@ const ReportFormSection = ({
               name="lokasi"
               value={formData.lokasi}
               onChange={handleChange}
-              placeholder="contoh : FMIPA IPB"
+              placeholder={
+                isPenemuan
+                  ? "contoh : Perpustakaan IPB"
+                  : "contoh : FMIPA IPB"
+              }
               className={`
                 w-full
                 rounded-xl
@@ -261,7 +270,10 @@ const ReportFormSection = ({
           <div>
 
             <label className="font-semibold text-[#102348]">
-              Tanggal Kehilangan <span className="text-red-500">*</span>
+              {isPenemuan
+                ? "Tanggal Penemuan"
+                : "Tanggal Kehilangan"}{" "}
+              <span className="text-red-500">*</span>
             </label>
 
             <DatePicker
@@ -297,34 +309,29 @@ const ReportFormSection = ({
           }
         `}
       >
-
         <div className="flex items-start gap-4 mb-8">
-
           <div className="w-12 h-12 rounded-2xl bg-[#EDF6FF] flex items-center justify-center text-[#5B9BD5]">
             <i className="fas fa-camera text-lg"></i>
           </div>
 
           <div>
-
             <h2 className="text-xl font-bold text-[#102348] mb-1">
-              Bukti Visual
+              Bukti Visual <span className="text-red-500">*</span>
             </h2>
 
             <p className="text-sm text-gray-500">
-              Sertakan foto yang jelas untuk meningkatkan identifikasi.
+              {isPenemuan
+                ? "Sertakan foto barang yang ditemukan agar lebih mudah dikenali."
+                : "Sertakan foto barang yang hilang agar lebih mudah dikenali."}
             </p>
-
           </div>
-
         </div>
 
         {/* AREA UPLOAD */}
         <div className="border-2 border-dashed border-[#D8E1EE] rounded-[24px] py-16 flex flex-col items-center justify-center text-center bg-[#FAFBFD]">
 
-          {/* BELUM ADA FOTO */}
           {!selectedImage ? (
             <>
-
               <div className="w-16 h-16 rounded-full bg-[#EDF4FF] flex items-center justify-center text-[#1B4D9B] mb-5">
                 <i className="fas fa-cloud-upload-alt text-2xl"></i>
               </div>
@@ -366,14 +373,12 @@ const ReportFormSection = ({
 
               {errors.selectedImage && (
                 <p className="text-red-500 text-xs mt-5">
-                  Bukti visual wajib diisi
+                  {errors.selectedImage}
                 </p>
               )}
-
             </>
           ) : (
             <>
-
               <img
                 src={URL.createObjectURL(selectedImage)}
                 alt="Preview"
@@ -389,7 +394,6 @@ const ReportFormSection = ({
 
               <button
                 onClick={() => {
-
                   setState({
                     selectedImage: null,
                     errors: {
@@ -421,29 +425,22 @@ const ReportFormSection = ({
                 <i className="fas fa-trash-alt"></i>
                 Hapus Foto
               </button>
-
             </>
           )}
-
         </div>
-
       </section>
 
-      {/* PELAPOR */}
+      {/* KONFIRMASI */}
       <section className="bg-white rounded-[24px] border border-[#E7ECF3] p-8 mb-6 shadow-sm">
-
         <div className="bg-[#FFF9EA] border border-[#F5E7B5] rounded-2xl p-5 flex items-start gap-4 text-sm text-gray-600 leading-relaxed">
-
           <i className="fas fa-shield-alt text-[#C89B00] mt-1"></i>
 
           <p>
-            Dengan mengirimkan formulir ini, Anda menyatakan bahwa
-            informasi kehilangan barang yang diberikan adalah benar dan
-            dapat dipertanggungjawabkan.
+            {isPenemuan
+              ? "Dengan mengirimkan formulir ini, Anda menyatakan bahwa informasi penemuan barang yang diberikan adalah benar dan dapat dipertanggungjawabkan."
+              : "Dengan mengirimkan formulir ini, Anda menyatakan bahwa informasi kehilangan barang yang diberikan adalah benar dan dapat dipertanggungjawabkan."}
           </p>
-
         </div>
-
       </section>
 
       {/* FOOTER BUTTON */}
@@ -462,14 +459,12 @@ const ReportFormSection = ({
         </button>
 
         <div className="flex gap-4">
-
           <button
             onClick={() => {
 
               const valid = validateForm();
 
               if (!valid) {
-
                 setState({
                   showErrorModal: true,
                 });
@@ -485,11 +480,8 @@ const ReportFormSection = ({
           >
             Kirim Laporan
           </button>
-
         </div>
-
       </div>
-
     </>
   );
 };

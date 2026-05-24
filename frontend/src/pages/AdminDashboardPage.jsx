@@ -297,6 +297,15 @@ class AdminDashboardPage extends Component {
     );
   }
 
+  getImageSrc(dokumentasi) {
+    if (!dokumentasi) return "/images/logo-ipb.png";
+    if (dokumentasi.startsWith("data:image/")) return dokumentasi;
+    if (dokumentasi.startsWith("http")) return dokumentasi;
+    if (dokumentasi.startsWith("/")) return dokumentasi;
+
+    return `/images/${dokumentasi}`;
+  }
+
   renderDetailModal() {
     const report = this.state.selectedReport;
 
@@ -323,11 +332,7 @@ class AdminDashboardPage extends Component {
                 </span>
 
                 <img
-                  src={
-                    report.dokumentasi
-                      ? `/assets/images/${report.dokumentasi}`
-                      : "/assets/images/bag.jpg"
-                  }
+                  src={this.getImageSrc(report.dokumentasi)}
                   alt={report.item_name}
                   className="w-full h-72 object-cover"
                 />
@@ -387,7 +392,7 @@ class AdminDashboardPage extends Component {
                         : "bg-[#002B5B] text-white"
                     }`}
                   >
-                    Verify
+                    Verifikasi
                   </button>
 
                   <button
@@ -399,7 +404,7 @@ class AdminDashboardPage extends Component {
                         : "bg-red-600 text-white"
                     }`}
                   >
-                    Deny
+                    Tolak
                   </button>
                 </div>
               </div>
@@ -482,7 +487,7 @@ class AdminDashboardPage extends Component {
             className={`
               flex-1 p-6 md:p-10 overflow-y-auto
               transition-[margin] duration-300
-              ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+              ${this.state.isSidebarExpanded ? "ml-64" : "ml-16"}
             `}
           >
             <PageHeader
@@ -495,7 +500,7 @@ class AdminDashboardPage extends Component {
                   className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
                 >
                   <i className="fas fa-user mr-2"></i>
-                  Mode User
+                  Mode Pengguna
                 </button>
               }
             />
@@ -509,7 +514,7 @@ class AdminDashboardPage extends Component {
             <section className="flex flex-col lg:flex-row justify-between gap-6 mb-8">
               <div>
                 <h2 className="text-4xl font-extrabold text-[#002B5B] mb-2">
-                  Welcome Admin’s
+                  Selamat Datang Admin
                 </h2>
                 <p className="text-gray-500 text-sm max-w-lg leading-relaxed">
                   A view of lost and found assets across IPB University campuses.
@@ -520,7 +525,7 @@ class AdminDashboardPage extends Component {
               <div className="flex gap-3">
                 <div className="bg-gray-200 px-7 py-4 rounded-xl text-center">
                   <p className="text-[10px] font-black tracking-widest text-gray-500">
-                    ACTIVE LOST
+                    LAPORAN KEHILANGAN
                   </p>
                   <p className="text-2xl font-black text-[#002B5B]">
                     {summary.active_lost}
@@ -529,7 +534,7 @@ class AdminDashboardPage extends Component {
 
                 <div className="bg-[#002B5B] px-7 py-4 rounded-xl text-center">
                   <p className="text-[10px] font-black tracking-widest text-white/70">
-                    TOTAL FOUND
+                    LAPORAN PENEMUAN
                   </p>
                   <p className="text-2xl font-black text-white">
                     {summary.total_found}
@@ -544,18 +549,18 @@ class AdminDashboardPage extends Component {
                   <div>
                     <h3 className="text-xl font-extrabold">Trends & Metrics</h3>
                     <p className="text-xs text-gray-400">
-                      Lost vs Found volume (Last 30 days)
+                      Volume Hilang vs Ditemukan (30 hari terakhir)
                     </p>
                   </div>
 
                   <div className="flex gap-4 text-xs font-bold">
                     <span>
                       <i className="fas fa-circle text-[#002B5B] mr-1"></i>
-                      Lost
+                      Hilang
                     </span>
                     <span>
                       <i className="fas fa-circle text-[#F4D35E] mr-1"></i>
-                      Found
+                      Ditemukan
                     </span>
                   </div>
                 </div>
@@ -570,7 +575,7 @@ class AdminDashboardPage extends Component {
                   </div>
 
                   <h3 className="text-2xl font-medium leading-tight mb-3">
-                    Identity Verification Pending
+                    Menunggu Verifikasi Identitas
                   </h3>
 
                   <p className="text-sm text-white/60 leading-relaxed">
@@ -587,7 +592,7 @@ class AdminDashboardPage extends Component {
 
             <section className="bg-white rounded-[30px] p-8 shadow-sm">
               <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-extrabold">Recent Reports</h3>
+                <h3 className="text-2xl font-extrabold">Laporan Terbaru</h3>
 
                 <div className="flex gap-3">
                   <div className="relative">
@@ -634,18 +639,18 @@ class AdminDashboardPage extends Component {
               </div>
 
               {isLoading ? (
-                <p className="text-gray-400 text-sm">Loading reports...</p>
+                <p className="text-gray-400 text-sm">Memuat laporan...</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-[10px] text-gray-400 uppercase tracking-widest">
                         <th className="text-left py-4">ID</th>
-                        <th className="text-left py-4">Item Name</th>
-                        <th className="text-left py-4">Reporter</th>
+                        <th className="text-left py-4">Nama Barang</th>
+                        <th className="text-left py-4">Pelapor</th>
                         <th className="text-left py-4">Status</th>
-                        <th className="text-left py-4">Date</th>
-                        <th className="text-left py-4">Actions</th>
+                        <th className="text-left py-4">Tanggal</th>
+                        <th className="text-left py-4">Aksi</th>
                       </tr>
                     </thead>
 
@@ -697,7 +702,7 @@ class AdminDashboardPage extends Component {
                                     : "bg-[#002B5B] text-white"
                                 }`}
                               >
-                                Verify
+                                Verifikasi
                               </button>
 
                               <button
@@ -711,14 +716,14 @@ class AdminDashboardPage extends Component {
                                     : "bg-red-600 text-white"
                                 }`}
                               >
-                                Deny
+                                Tolak
                               </button>
 
                               <button
                                 onClick={() => this.handleOpenDetail(report)}
                                 className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg text-xs font-bold"
                               >
-                                Details
+                                Detail
                               </button>
                             </td>
                           </tr>
@@ -729,7 +734,7 @@ class AdminDashboardPage extends Component {
                 </div>
               )}
               <div className="flex justify-between items-center mt-8 text-xs text-gray-500">
-                <p>Showing {reports.length} reports</p>
+                <p>Menampilkan {reports.length} laporan</p>
               </div>
             </section>
 

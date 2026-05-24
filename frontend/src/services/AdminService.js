@@ -27,6 +27,14 @@ class AdminService extends ApiService {
     return this.handleResponse(res);
   }
 
+  async getAllReports() {
+    const res = await fetch(`${this.baseUrl}/admin/laporan`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse(res);
+  }
+
   async verifyReport(laporanId, catatanVerifikasi = "Laporan valid dan disetujui admin") {
     const res = await fetch(`${this.baseUrl}/admin/laporan/${laporanId}/setujui`, {
       method: "PATCH",
@@ -42,6 +50,43 @@ class AdminService extends ApiService {
       method: "PATCH",
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ catatan_verifikasi: catatanVerifikasi }),
+    });
+
+    return this.handleResponse(res);
+  }
+
+  async getPendingClaims() {
+    const res = await fetch(`${this.baseUrl}/admin/klaim/pending`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse(res);
+  }
+
+  async verifyClaim(klaimId, statusKlaim, catatanAdmin = "") {
+    const res = await fetch(`${this.baseUrl}/admin/klaim/${klaimId}/verifikasi`, {
+      method: "PATCH",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        status_klaim: statusKlaim,
+        catatan_admin: catatanAdmin,
+      }),
+    });
+
+    return this.handleResponse(res);
+  }
+
+  async getSerahTerima(klaimId) {
+    const res = await fetch(`${this.baseUrl}/serah-terima/${klaimId}`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse(res);
+  }
+
+  async verifySerahTerima(klaimId) {
+    const res = await fetch(`${this.baseUrl}/serah-terima/${klaimId}/verify`, {
+      headers: this.getAuthHeaders(),
     });
 
     return this.handleResponse(res);

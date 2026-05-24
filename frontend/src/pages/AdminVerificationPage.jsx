@@ -1,0 +1,1663 @@
+import React, { Component } from "react";
+import AdminSidebar from "../components/admin/AdminSidebar";
+import PageHeader from "../components/PageHeader";
+import PageFooter from "../components/PageFooter";
+import AuthService from "../services/AuthService";
+import AdminService from "../services/AdminService";
+import {
+  getStoredSidebarExpanded,
+  setStoredSidebarExpanded,
+} from "../utils/sidebarState";
+
+class AdminVerificationPage extends Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      reports: [],
+      filteredReports: [],
+      pendingClaims: [],
+      loading: true,
+      claimsLoading: true,
+      search: "",
+      currentPage: 1,
+      reportsPerPage: 10,
+      activeVerificationView: "laporan",
+
+      selectedFilter: "semua",
+      showFilterMenu: false,
+
+      selectedReport: null,
+      showDetailModal: false,
+
+      showRejectModal: false,
+      selectedReportId: null,
+      rejectNote: "",
+      errorReject: "",
+
+      showApproveModal: false,
+      selectedApproveId: null,
+      handoverDocument: null,
+      handoverVerification: null,
+      showHandoverModal: false,
+      handoverLoading: false,
+
+      popup: {
+        show: false,
+        type: "",
+        message: "",
+      },
+
+      isSidebarExpanded: getStoredSidebarExpanded(),
+    };
+  }
+
+  async componentDidMount() {
+    const user = AuthService.getCurrentUser();
+
+    if (!user || user.role !== "admin") {
+      window.location.href = "/dashboard";
+      return;
+    }
+
+    await Promise.all([
+      this.fetchReports(),
+      this.fetchPendingClaims(),
+    ]);
+  }
+
+  toggleSidebar = () => {
+    this.setState((prev) => {
+      const expanded = !prev.isSidebarExpanded;
+      setStoredSidebarExpanded(expanded);
+
+      return {
+        isSidebarExpanded: expanded,
+      };
+    });
+  };
+
+  goToUserMode = () => {
+    if (this.props.navigate) {
+      this.props.navigate("/dashboard");
+    } else {
+      window.location.href = "/dashboard";
+    }
+  };
+
+  toggleFilterMenu = () => {
+    this.setState({
+        showFilterMenu: !this.state.showFilterMenu,
+    });
+    };
+
+    handleFilterChange = (filter) => {
+    const { reports, search } = this.state;
+
+    let filtered = [...reports];
+
+    if (filter !== "semua") {
+        filtered = filtered.filter(
+        (item) => item.status_verifikasi === filter
+        );
+    }
+
+    if (search) {
+        filtered = filtered.filter((item) =>
+        item.nama_barang
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+        item.pelapor
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+        item.kategori
+            ?.toLowerCase()
+            .includes(search.toLowerCase())
+        );
+    }
+
+    this.setState({
+        selectedFilter: filter,
+        filteredReports: filtered,
+        showFilterMenu: false,
+        currentPage: 1,
+    });
+    };
+
+  fetchReports = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/admin/laporan",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      this.setState({
+        reports: Array.isArray(data) ? data : [],
+        filteredReports: Array.isArray(data) ? data : [],
+        currentPage: 1,
+        loading: false,
+      });
+    } catch (error) {
+      console.log(error);
+
+      this.setState({
+        loading: false,
+      });
+    }
+  };
+
+    handleSearch = (e) => {
+    const value = e.target.value;
+
+    const { reports, selectedFilter } = this.state;
+
+    let filtered = [...reports];
+
+    if (selectedFilter !== "semua") {
+        filtered = filtered.filter(
+        (item) => item.status_verifikasi === selectedFilter
+        );
+    }
+
+    filtered = filtered.filter((item) =>
+        item.nama_barang
+        ?.toLowerCase()
+        .includes(value.toLowerCase()) ||
+        item.pelapor
+        ?.toLowerCase()
+        .includes(value.toLowerCase()) ||
+        item.kategori
+        ?.toLowerCase()
+        .includes(value.toLowerCase())
+    );
+
+    this.setState({
+      search: value,
+      filteredReports: filtered,
+      currentPage: 1,
+    });
+    };
+
+  showPopup = (type, message) => {
+    this.setState({
+      popup: {
+        show: true,
+        type,
+        message,
+      },
+    });
+
+    setTimeout(() => {
+      this.setState({
+        popup: {
+          show: false,
+          type: "",
+          message: "",
+        },
+      });
+    }, 3000);
+  };
+
+  fetchPendingClaims = async () => {
+    this.setState({ claimsLoading: true });
+
+    try {
+      const data = await AdminService.getPendingClaims();
+
+      this.setState({
+        pendingClaims: Array.isArray(data) ? data : [],
+        claimsLoading: false,
+      });
+    } catch (error) {
+      console.log(error);
+
+      this.setState({
+        pendingClaims: [],
+        claimsLoading: false,
+      });
+    }
+  };
+
+  handleClaimVerification = async (claim, statusKlaim) => {
+    const isAccepted = statusKlaim === "diterima";
+    const catatanAdmin = isAccepted
+      ? "Klaim diterima admin. Status barang otomatis menjadi selesai/dikembalikan sesuai BE."
+      : "Klaim ditolak admin.";
+
+    try {
+      await AdminService.verifyClaim(
+        claim.klaim_id,
+        statusKlaim,
+        catatanAdmin
+      );
+
+      let handoverDocument = null;
+      let handoverVerification = null;
+
+      if (isAccepted) {
+        this.setState({ handoverLoading: true });
+
+        handoverDocument = await AdminService.getSerahTerima(claim.klaim_id);
+        handoverVerification = await AdminService.verifySerahTerima(
+          claim.klaim_id
+        );
+      }
+
+      this.setState((prevState) => ({
+        pendingClaims: prevState.pendingClaims.filter(
+          (item) => item.klaim_id !== claim.klaim_id
+        ),
+        handoverDocument,
+        handoverVerification,
+        showHandoverModal: isAccepted,
+        handoverLoading: false,
+      }));
+
+      this.showPopup(
+        isAccepted ? "success" : "error",
+        isAccepted
+          ? "Klaim diterima. BE mengubah status barang menjadi selesai."
+          : "Klaim berhasil ditolak"
+      );
+    } catch (error) {
+      console.log(error);
+
+      this.setState({ handoverLoading: false });
+
+      this.showPopup(
+        "error",
+        error.message || "Gagal memverifikasi klaim"
+      );
+    }
+  };
+
+  closeHandoverModal = () => {
+    this.setState({
+      handoverDocument: null,
+      handoverVerification: null,
+      showHandoverModal: false,
+      handoverLoading: false,
+    });
+  };
+
+  getReportTypeMeta(jenisLaporan) {
+    const isFound = jenisLaporan === "penemuan";
+
+    return {
+      label: isFound ? "Ditemukan" : "Hilang",
+      icon: isFound ? "fa-search-location" : "fa-exclamation-circle",
+      badgeClass: isFound
+        ? "bg-[#E8F7FA] text-[#006D8F] border-[#B9E7EF]"
+        : "bg-[#EEF4FF] text-[#163A70] border-[#CFE0F7]",
+      imageClass: isFound
+        ? "bg-[#006D8F] text-white"
+        : "bg-[#163A70] text-white",
+      cardAccentClass: isFound
+        ? "border-l-4 border-l-[#006D8F]"
+        : "border-l-4 border-l-[#163A70]",
+    };
+  }
+
+  getImageSrc(dokumentasi) {
+    if (!dokumentasi) return "/images/no-image.png";
+    if (dokumentasi.startsWith("data:image/")) return dokumentasi;
+    if (dokumentasi.startsWith("http")) return dokumentasi;
+    if (dokumentasi.startsWith("/")) return dokumentasi;
+
+    return `/images/${dokumentasi}`;
+  }
+
+  setPage = (page) => {
+    this.setState({
+      currentPage: page,
+    });
+  };
+
+  openDetailModal = (report) => {
+    this.setState({
+      selectedReport: report,
+      showDetailModal: true,
+    });
+  };
+
+  closeDetailModal = () => {
+    this.setState({
+      selectedReport: null,
+      showDetailModal: false,
+    });
+  };
+
+  openRejectModal = (id) => {
+    this.setState({
+      showRejectModal: true,
+      selectedReportId: id,
+      rejectNote: "",
+      errorReject: "",
+    });
+  };
+
+  closeRejectModal = () => {
+    this.setState({
+      showRejectModal: false,
+      selectedReportId: null,
+      rejectNote: "",
+      errorReject: "",
+    });
+  };
+
+  openApproveModal = (id) => {
+    this.setState({
+      showApproveModal: true,
+      selectedApproveId: id,
+    });
+  };
+
+  closeApproveModal = () => {
+    this.setState({
+      showApproveModal: false,
+      selectedApproveId: null,
+    });
+  };
+
+  handleApprove = async (id) => {
+    try {
+      const token = localStorage.getItem("access_token");
+
+      await fetch(
+        `http://127.0.0.1:8000/admin/laporan/${id}/setujui`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            catatan_verifikasi: "Laporan diverifikasi admin",
+          }),
+        }
+      );
+
+      const updated = this.state.reports.map((item) => {
+        if (item.laporan_id === id) {
+          return {
+            ...item,
+            status_verifikasi: "terverifikasi",
+          };
+        }
+
+        return item;
+      });
+
+      this.setState({
+        reports: updated,
+        filteredReports: updated,
+      });
+
+      this.closeApproveModal();
+
+      this.showPopup(
+        "success",
+        "Laporan berhasil diverifikasi"
+      );
+    } catch (error) {
+      console.log(error);
+
+      this.showPopup(
+        "error",
+        "Gagal memverifikasi laporan"
+      );
+    }
+  };
+
+  handleReject = async () => {
+    const {
+      rejectNote,
+      selectedReportId,
+    } = this.state;
+
+    if (!rejectNote.trim()) {
+      this.setState({
+        errorReject:
+          "Catatan penolakan wajib diisi",
+      });
+
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("access_token");
+
+      await fetch(
+        `http://127.0.0.1:8000/admin/laporan/${selectedReportId}/tolak`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            catatan_verifikasi: rejectNote,
+          }),
+        }
+      );
+
+      const updated = this.state.reports.map((item) => {
+        if (item.laporan_id === selectedReportId) {
+          return {
+            ...item,
+            status_verifikasi: "ditolak",
+            catatan_verifikasi: rejectNote,
+          };
+        }
+
+        return item;
+      });
+
+      this.setState({
+        reports: updated,
+        filteredReports: updated,
+      });
+
+      this.closeRejectModal();
+
+      this.showPopup(
+        "error",
+        "Laporan berhasil ditolak"
+      );
+    } catch (error) {
+      console.log(error);
+
+      this.showPopup(
+        "error",
+        "Gagal menolak laporan"
+      );
+    }
+  };
+
+  renderApproveModal() {
+    const { showApproveModal } = this.state;
+
+    if (!showApproveModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-[24px] w-full max-w-sm p-6 text-center shadow-2xl">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#EEF4FF] flex items-center justify-center">
+            <i className="fas fa-check text-[#163A70] text-xl"></i>
+          </div>
+
+          <h2 className="text-xl font-extrabold text-[#102348] mb-2">
+            Verifikasi Laporan?
+          </h2>
+
+          <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            Laporan yang diverifikasi akan langsung disetujui oleh admin.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={this.closeApproveModal}
+              className="py-3 rounded-xl bg-[#EEF2F7] text-[#163A70] text-sm font-bold"
+            >
+              Batal
+            </button>
+
+            <button
+              onClick={() =>
+                this.handleApprove(
+                  this.state.selectedApproveId
+                )
+              }
+              className="py-3 rounded-xl bg-[#163A70] text-white text-sm font-bold"
+            >
+              Ya, Verifikasi
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  renderRejectModal() {
+    const {
+      showRejectModal,
+      rejectNote,
+      errorReject,
+    } = this.state;
+
+    if (!showRejectModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-[28px] w-full max-w-lg p-8 shadow-2xl">
+          <h2 className="text-2xl font-extrabold text-[#102348] mb-2">
+            Tolak Laporan
+          </h2>
+
+          <p className="text-sm text-gray-500 mb-6">
+            Berikan alasan penolakan laporan.
+          </p>
+
+          <textarea
+            value={rejectNote}
+            onChange={(e) =>
+              this.setState({
+                rejectNote: e.target.value,
+                errorReject: "",
+              })
+            }
+            rows="5"
+            placeholder="Masukkan alasan penolakan..."
+            className={`
+              w-full
+              rounded-2xl
+              border
+              p-4
+              text-sm
+              outline-none
+              resize-none
+              ${
+                errorReject
+                  ? "border-red-400"
+                  : "border-[#DCE4EE]"
+              }
+            `}
+          />
+
+          {errorReject && (
+            <p className="text-red-500 text-xs mt-2 font-semibold">
+              {errorReject}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 mt-6">
+            <button
+              onClick={this.closeRejectModal}
+              className="px-5 py-3 rounded-xl bg-[#EEF2F7] text-[#163A70] text-sm font-bold"
+            >
+              Batal
+            </button>
+
+            <button
+              onClick={this.handleReject}
+              className="px-5 py-3 rounded-xl bg-[#D92D20] text-white text-sm font-bold"
+            >
+              Tolak Laporan
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  renderHandoverModal() {
+    const {
+      showHandoverModal,
+      handoverDocument,
+      handoverVerification,
+      handoverLoading,
+    } = this.state;
+
+    if (!showHandoverModal && !handoverLoading) return null;
+
+    const signatureValid = handoverVerification?.valid;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-6">
+        <div className="bg-white rounded-[28px] w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="sticky top-0 bg-white border-b border-[#EEF2F6] px-6 py-5 flex items-center justify-between rounded-t-[28px]">
+            <div>
+              <h2 className="text-2xl font-extrabold text-[#102348]">
+                Serah Terima & Tanda Tangan Digital
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Dokumen dibuat otomatis oleh BE setelah klaim diterima.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={this.closeHandoverModal}
+              className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+              aria-label="Tutup dokumen serah terima"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+          </div>
+
+          {handoverLoading ? (
+            <div className="p-10 text-center text-gray-400 font-semibold">
+              Membuat dan memverifikasi dokumen serah terima...
+            </div>
+          ) : (
+            <div className="p-6 space-y-5">
+              <div
+                className={`rounded-2xl px-5 py-4 border ${
+                  signatureValid
+                    ? "bg-blue-50 border-blue-100 text-[#2563EB]"
+                    : "bg-red-50 border-red-100 text-red-600"
+                }`}
+              >
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest mb-1">
+                      Status Tanda Tangan
+                    </p>
+                    <h3 className="text-lg font-extrabold">
+                      {handoverVerification?.message || "Belum diverifikasi"}
+                    </h3>
+                  </div>
+
+                  <div className="flex gap-2 text-xs font-black">
+                    <span className="bg-white/80 px-3 py-2 rounded-xl">
+                      Hash: {handoverVerification?.hash_valid ? "Valid" : "Tidak valid"}
+                    </span>
+                    <span className="bg-white/80 px-3 py-2 rounded-xl">
+                      Tanda tangan: {handoverVerification?.signature_valid ? "Valid" : "Tidak valid"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 bg-[#F8FAFC] rounded-2xl border border-[#E7ECF3] p-5">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
+                    Dokumen Serah Terima
+                  </p>
+
+                  <pre className="whitespace-pre-wrap text-sm leading-relaxed text-[#102348] font-['Plus_Jakarta_Sans']">
+                    {handoverDocument?.dokumen_text || "-"}
+                  </pre>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      Klaim
+                    </p>
+                    <p className="text-sm font-bold text-[#102348]">
+                      Klaim #{handoverDocument?.klaim_id || "-"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Serah Terima #{handoverDocument?.serah_terima_id || "-"}
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      Document Hash
+                    </p>
+                    <p className="break-all text-xs font-bold text-[#2563EB] leading-relaxed">
+                      {handoverDocument?.dokumen_hash || "-"}
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      Tanda Tangan Digital
+                    </p>
+                    <p className="break-all text-[10px] text-gray-500 leading-relaxed max-h-28 overflow-y-auto">
+                      {handoverDocument?.digital_signature || "-"}
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      Kunci Publik
+                    </p>
+                    <pre className="whitespace-pre-wrap break-all text-[10px] text-gray-500 leading-relaxed max-h-32 overflow-y-auto">
+                      {handoverDocument?.public_key || "-"}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  renderDetailModal() {
+    const {
+      selectedReport,
+      showDetailModal,
+    } = this.state;
+
+    if (!showDetailModal || !selectedReport)
+      return null;
+
+    const isDisabled =
+      selectedReport.status_verifikasi !==
+      "belum_diverifikasi";
+
+    return (
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-6">
+        <div className="bg-white rounded-[24px] w-full max-w-5xl p-5 md:p-6 relative max-h-[90vh] overflow-y-auto">
+          <button
+            type="button"
+            onClick={this.closeDetailModal}
+            className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+          >
+            <i className="fas fa-times"></i>
+          </button>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+            <div>
+              <div className="relative rounded-[25px] overflow-hidden bg-gray-100">
+                <span className="absolute top-4 left-4 bg-[#006D8F] text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase">
+                  {selectedReport.status_barang || "status"}
+                </span>
+
+                <img
+                  src={this.getImageSrc(selectedReport.dokumentasi)}
+                  alt={selectedReport.nama_barang}
+                  className="w-full h-72 object-cover"
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2 md:pr-12">
+              <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start mb-4">
+                <div>
+                  <p className="text-[#9A7D0A] text-xs font-black uppercase tracking-widest">
+                    {selectedReport.kategori || "Kategori"}
+                  </p>
+
+                  <h2 className="text-3xl font-extrabold text-[#002B5B]">
+                    {selectedReport.nama_barang}
+                  </h2>
+                </div>
+
+                <div className="md:text-right">
+                  <p className="text-gray-400 text-xs font-black uppercase">
+                    Dilaporkan
+                  </p>
+
+                  <p className="text-[#002B5B] font-semibold">
+                    {selectedReport.tanggal_kejadian || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-500 text-sm leading-relaxed mb-6">
+                {selectedReport.deskripsi || "Tidak ada deskripsi."}
+              </p>
+
+              <div className="flex flex-wrap gap-4 mb-8">
+                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+                  <i className="fas fa-map-marker-alt mr-2 text-[#002B5B]"></i>
+                  {selectedReport.lokasi || "-"}
+                </div>
+
+                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+                  <i className="fas fa-user mr-2 text-[#002B5B]"></i>
+                  {selectedReport.pelapor || "-"}
+                </div>
+
+                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+                  <i className="fas fa-envelope mr-2 text-[#002B5B]"></i>
+                  {selectedReport.email || "-"}
+                </div>
+
+                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700 capitalize">
+                  <i className="fas fa-clipboard-list mr-2 text-[#002B5B]"></i>
+                  {selectedReport.jenis_laporan || "-"}
+                </div>
+              </div>
+
+              {selectedReport.catatan_verifikasi && (
+                <div className="mb-8 bg-[#FFF7F7] border border-red-100 rounded-2xl p-4">
+                  <p className="text-xs font-bold text-red-500 mb-1">
+                    Catatan Verifikasi
+                  </p>
+
+                  <p className="text-sm text-gray-600">
+                    {selectedReport.catatan_verifikasi}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
+                <p className="text-xs text-gray-400 font-bold">
+                  ID: #IPB-{selectedReport.laporan_id}
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    disabled={isDisabled}
+                    onClick={() =>
+                      this.openApproveModal(
+                        selectedReport.laporan_id
+                      )
+                    }
+                    className={`px-6 py-3 rounded-lg text-xs font-bold ${
+                      isDisabled
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : "bg-[#002B5B] text-white"
+                    }`}
+                  >
+                    Setujui
+                  </button>
+
+                  <button
+                    disabled={isDisabled}
+                    onClick={() =>
+                      this.openRejectModal(
+                        selectedReport.laporan_id
+                      )
+                    }
+                    className={`px-6 py-3 rounded-lg text-xs font-bold ${
+                      isDisabled
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : "bg-[#C9181F] text-white"
+                    }`}
+                  >
+                    Tolak
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  render() {
+    const {
+      loading,
+      filteredReports,
+      pendingClaims,
+      claimsLoading,
+      popup,
+      currentPage,
+      reportsPerPage,
+    } = this.state;
+
+    const totalPages = Math.max(
+      1,
+      Math.ceil(filteredReports.length / reportsPerPage)
+    );
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * reportsPerPage;
+    const paginatedReports = filteredReports.slice(
+      startIndex,
+      startIndex + reportsPerPage
+    );
+
+    const pendingCount = filteredReports.filter(
+      (r) =>
+        r.status_verifikasi ===
+        "belum_diverifikasi"
+    ).length;
+
+    const verifiedCount = filteredReports.filter(
+      (r) =>
+        r.status_verifikasi ===
+        "terverifikasi"
+    ).length;
+
+    const rejectedCount = filteredReports.filter(
+      (r) => r.status_verifikasi === "ditolak"
+    ).length;
+
+    return (
+      <div className="min-h-screen bg-[#F6F7FB] font-['Plus_Jakarta_Sans'] text-[#002B5B]">
+        <div className="flex min-h-screen">
+          <AdminSidebar
+            activeMenu="verification"
+            expanded={this.state.isSidebarExpanded}
+            navigate={this.props.navigate}
+          />
+
+          <main
+            className={`
+              flex-1
+              p-6
+              md:p-10
+              overflow-y-auto
+              transition-[margin] duration-300
+              ${
+                this.state.isSidebarExpanded
+                  ? "ml-64"
+                  : "ml-16"
+              }
+            `}
+          >
+            <PageHeader
+              onToggleSidebar={this.toggleSidebar}
+              profileIcon="fa-user-shield"
+              actions={
+                <button
+                  type="button"
+                  onClick={this.goToUserMode}
+                  className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
+                >
+                  <i className="fas fa-user mr-2"></i>
+                  Mode Pengguna
+                </button>
+              }
+            />
+
+            <div className="mb-8">
+              <h1 className="text-4xl font-extrabold text-[#163A70] mb-2">
+                Verifikasi Laporan
+              </h1>
+
+              <p className="text-gray-500 text-sm">
+                Kelola dan verifikasi laporan
+                kehilangan dan penemuan civitas
+                IPB.
+              </p>
+            </div>
+
+            <div className="inline-flex bg-white border border-[#E7ECF3] rounded-2xl p-1 mb-8 shadow-sm">
+              <button
+                type="button"
+                onClick={() =>
+                  this.setState({ activeVerificationView: "laporan" })
+                }
+                className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  this.state.activeVerificationView === "laporan"
+                    ? "bg-[#163A70] text-white"
+                    : "text-[#163A70] hover:bg-[#F5F7FB]"
+                }`}
+              >
+                Verifikasi Laporan
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  this.setState({ activeVerificationView: "klaim" })
+                }
+                className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  this.state.activeVerificationView === "klaim"
+                    ? "bg-[#163A70] text-white"
+                    : "text-[#163A70] hover:bg-[#F5F7FB]"
+                }`}
+              >
+                Verifikasi Klaim Barang
+              </button>
+            </div>
+
+            {this.state.activeVerificationView === "laporan" && (
+              <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="bg-white rounded-[24px] border border-[#E7ECF3] p-6">
+                <p className="text-sm text-gray-400 font-bold mb-2">
+                  Menunggu
+                </p>
+
+                <h2 className="text-3xl font-black text-[#2563EB]">
+                  {pendingCount}
+                </h2>
+              </div>
+
+              <div className="bg-white rounded-[24px] border border-[#E7ECF3] p-6">
+                <p className="text-sm text-gray-400 font-bold mb-2">
+                  Terverifikasi
+                </p>
+
+                <h2 className="text-3xl font-black text-[#2563EB]">
+                  {verifiedCount}
+                </h2>
+              </div>
+
+              <div className="bg-white rounded-[24px] border border-[#E7ECF3] p-6">
+                <p className="text-sm text-gray-400 font-bold mb-2">
+                  Ditolak
+                </p>
+
+                <h2 className="text-3xl font-black text-[#2563EB]">
+                  {rejectedCount}
+                </h2>
+              </div>
+            </div>
+              </>
+            )}
+
+            {this.state.activeVerificationView === "klaim" && (
+            <section className="bg-white rounded-[28px] border border-[#E7ECF3] p-6 mb-8">
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
+                <div>
+                  <h2 className="text-2xl font-extrabold text-[#163A70]">
+                    Verifikasi Klaim Barang
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Klaim yang diterima mengikuti BE saat ini: status barang otomatis menjadi <span className="font-bold">selesai</span>, ditampilkan sebagai Dikembalikan.
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 text-[#2563EB] px-4 py-2 rounded-xl text-xs font-black">
+                  {pendingClaims.length} klaim menunggu
+                </div>
+              </div>
+
+              {claimsLoading ? (
+                <p className="text-gray-400 text-sm">Memuat klaim...</p>
+              ) : pendingClaims.length === 0 ? (
+                <div className="bg-[#F8FAFC] rounded-2xl px-5 py-6 text-sm text-gray-400 font-semibold">
+                  Tidak ada klaim barang yang menunggu verifikasi.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  {pendingClaims.map((claim) => (
+                    <div
+                      key={claim.klaim_id}
+                      className="border border-[#E7ECF3] rounded-2xl p-5 bg-[#FCFDFF]"
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
+                            Klaim #{claim.klaim_id}
+                          </p>
+                          <h3 className="text-lg font-extrabold text-[#163A70]">
+                            {claim.nama_barang}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Laporan kehilangan #{claim.laporan_kehilangan_id}
+                          </p>
+                        </div>
+
+                        <span className="bg-blue-100 text-[#2563EB] px-3 py-1 rounded-full text-[10px] font-black">
+                          {claim.status_klaim}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                        <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+                          <p className="text-[10px] text-gray-400 font-black uppercase mb-1">
+                            Pengklaim
+                          </p>
+                          <p className="text-sm font-bold text-[#102348]">
+                            {claim.pengklaim || "-"}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {claim.email || "-"}
+                          </p>
+                        </div>
+
+                        <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+                          <p className="text-[10px] text-gray-400 font-black uppercase mb-1">
+                            Barang
+                          </p>
+                          <p className="text-sm font-bold text-[#102348]">
+                            #IPB-{claim.barang_id}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {claim.kategori || "-"} - {claim.lokasi || "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            this.handleClaimVerification(claim, "diterima")
+                          }
+                          disabled={this.state.handoverLoading}
+                          className="flex-1 bg-[#163A70] text-white rounded-xl px-4 py-3 text-xs font-bold hover:bg-[#102348] disabled:bg-gray-300 transition-all"
+                        >
+                          {this.state.handoverLoading
+                            ? "Memproses..."
+                            : "Terima & Buat Serah Terima"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            this.handleClaimVerification(claim, "ditolak")
+                          }
+                          disabled={this.state.handoverLoading}
+                          className="flex-1 bg-red-50 text-red-600 rounded-xl px-4 py-3 text-xs font-bold hover:bg-red-100 disabled:bg-gray-100 disabled:text-gray-400 transition-all"
+                        >
+                          Tolak Klaim
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            )}
+
+            {this.state.activeVerificationView === "laporan" && (
+              <>
+            <div className="flex items-center gap-4">
+            
+            <div className="relative">
+                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+
+                <input
+                type="text"
+                placeholder="Cari laporan..."
+                value={this.state.search}
+                onChange={this.handleSearch}
+                className="
+                    pl-11
+                    pr-4
+                    h-11
+                    w-[260px]
+                    rounded-2xl
+                    border
+                    border-[#E7ECF3]
+                    bg-white
+                    text-sm
+                    outline-none
+                    focus:border-[#163A70]
+                "
+                />
+            </div>
+
+            <div className="relative">
+                <button
+                onClick={this.toggleFilterMenu}
+                className="
+                    h-11
+                    px-5
+                    rounded-2xl
+                    border
+                    border-[#E7ECF3]
+                    bg-white
+                    text-sm
+                    font-semibold
+                    text-[#163A70]
+                    flex
+                    items-center
+                    gap-2
+                    hover:bg-[#F8FAFD]
+                    transition-all
+                "
+                >
+                <i className="fas fa-filter text-xs"></i>
+
+                {
+                    this.state.selectedFilter === "semua"
+                    ? "Semua"
+                    : this.state.selectedFilter === "belum_diverifikasi"
+                    ? "Menunggu"
+                    : this.state.selectedFilter === "terverifikasi"
+                    ? "Diverifikasi"
+                    : "Ditolak"
+                }
+
+                <i className="fas fa-chevron-down text-[10px]"></i>
+                </button>
+
+                {this.state.showFilterMenu && (
+                <div
+                    className="
+                    absolute
+                    right-0
+                    mt-3
+                    w-52
+                    bg-white
+                    rounded-2xl
+                    border
+                    border-[#E7ECF3]
+                    shadow-xl
+                    p-2
+                    z-40
+                    "
+                >
+                    <button
+                    onClick={() =>
+                        this.handleFilterChange("semua")
+                    }
+                    className={`
+                        w-full
+                        text-left
+                        px-4
+                        py-3
+                        rounded-xl
+                        text-sm
+                        font-semibold
+                        transition-all
+
+                        ${
+                        this.state.selectedFilter === "semua"
+                            ? "bg-[#EEF4FF] text-[#163A70]"
+                            : "text-gray-600 hover:bg-[#F8FAFD]"
+                        }
+                    `}
+                    >
+                    Semua
+                    </button>
+
+                    <button
+                    onClick={() =>
+                        this.handleFilterChange(
+                        "belum_diverifikasi"
+                        )
+                    }
+                    className={`
+                        w-full
+                        text-left
+                        px-4
+                        py-3
+                        rounded-xl
+                        text-sm
+                        font-semibold
+                        transition-all
+
+                        ${
+                        this.state.selectedFilter ===
+                        "belum_diverifikasi"
+                            ? "bg-[#FFF7E8] text-[#B7791F]"
+                            : "text-gray-600 hover:bg-[#F8FAFD]"
+                        }
+                    `}
+                    >
+                    Menunggu
+                    </button>
+
+                    <button
+                    onClick={() =>
+                        this.handleFilterChange(
+                        "terverifikasi"
+                        )
+                    }
+                    className={`
+                        w-full
+                        text-left
+                        px-4
+                        py-3
+                        rounded-xl
+                        text-sm
+                        font-semibold
+                        transition-all
+
+                        ${
+                        this.state.selectedFilter ===
+                        "terverifikasi"
+                            ? "bg-[#EEFDF3] text-[#0F9F4B]"
+                            : "text-gray-600 hover:bg-[#F8FAFD]"
+                        }
+                    `}
+                    >
+                    Diverifikasi
+                    </button>
+
+                    <button
+                    onClick={() =>
+                        this.handleFilterChange("ditolak")
+                    }
+                    className={`
+                        w-full
+                        text-left
+                        px-4
+                        py-3
+                        rounded-xl
+                        text-sm
+                        font-semibold
+                        transition-all
+
+                        ${
+                        this.state.selectedFilter ===
+                        "ditolak"
+                            ? "bg-[#FFF1F1] text-[#D92D20]"
+                            : "text-gray-600 hover:bg-[#F8FAFD]"
+                        }
+                    `}
+                    >
+                    Ditolak
+                    </button>
+                </div>
+                )}
+            </div>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-0 text-gray-400">
+                Memuat laporan...
+              </div>
+            ) : filteredReports.length === 0 ? (
+              <div className="bg-white rounded-[28px] p-20 text-center border border-[#E7ECF3]">
+                <i className="fas fa-inbox text-5xl text-gray-300 mb-4"></i>
+
+                <p className="text-gray-400 font-semibold">
+                  Belum ada laporan masuk
+                </p>
+              </div>
+            ) : (
+              <>
+              <div className="space-y-5">
+                {paginatedReports.map((report) => {
+                  const reportType =
+                    this.getReportTypeMeta(
+                      report.jenis_laporan
+                    );
+
+                  return (
+                  <div
+                    key={report.laporan_id}
+                    className={`
+                      bg-white
+                      border border-[#E7ECF3]
+                      ${reportType.cardAccentClass}
+                      rounded-[22px]
+                      p-4
+                      hover:shadow-sm
+                      transition-all
+                    `}
+                  >
+                    <div className="flex flex-col lg:flex-row gap-5">
+                      <div className="relative w-full lg:w-[280px] shrink-0">
+                        <img
+                          src={this.getImageSrc(report.dokumentasi)}
+                          alt={report.nama_barang}
+                          className="w-full h-56 lg:h-full min-h-[220px] object-cover rounded-[18px]"
+                        />
+
+                        <span
+                          className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-black ${reportType.imageClass}`}
+                        >
+                          #{report.laporan_id}
+                        </span>
+
+                        <span
+                          className={`absolute bottom-3 left-3 px-3 py-1 rounded-full text-[10px] font-black border ${reportType.badgeClass}`}
+                        >
+                          <i className={`fas ${reportType.icon} mr-1`}></i>
+                          {reportType.label}
+                        </span>
+                      </div>
+
+                      <div className="flex-1 min-w-0 flex flex-col gap-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <h3 className="text-xl font-extrabold text-[#163A70] leading-tight">
+                              {report.nama_barang}
+                            </h3>
+
+                            <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-3xl">
+                              {report.deskripsi || "Tidak ada deskripsi"}
+                            </p>
+                          </div>
+
+                          <div className="lg:text-right shrink-0">
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
+                              Pelapor
+                            </p>
+
+                            <h4 className="text-sm font-bold text-[#102348]">
+                              {report.pelapor}
+                            </h4>
+
+                            <p className="text-xs text-gray-500 mt-1">
+                              {report.email}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
+                              Jenis Laporan
+                            </p>
+
+                            <span
+                              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-black ${reportType.badgeClass}`}
+                            >
+                              <i className={`fas ${reportType.icon}`}></i>
+                              {reportType.label}
+                            </span>
+                          </div>
+
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
+                              Kategori
+                            </p>
+
+                            <p className="text-sm font-semibold text-gray-600">
+                              {report.kategori}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
+                              Lokasi
+                            </p>
+
+                            <p className="text-sm font-semibold text-gray-600">
+                              {report.lokasi}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
+                              Status Verifikasi
+                            </p>
+
+                            {report.status_verifikasi === "belum_diverifikasi" && (
+                              <span className="px-3 py-1 rounded-full text-[10px] font-black bg-[#FFF7E8] text-[#B7791F]">
+                                Belum Diverifikasi
+                              </span>
+                            )}
+
+                            {report.status_verifikasi === "terverifikasi" && (
+                              <span className="px-3 py-1 rounded-full text-[10px] font-black bg-[#EEFDF3] text-[#0F9F4B]">
+                                Terverifikasi
+                              </span>
+                            )}
+
+                            {report.status_verifikasi === "ditolak" && (
+                              <span className="px-3 py-1 rounded-full text-[10px] font-black bg-[#FFF1F1] text-[#D92D20]">
+                                Ditolak
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pt-2 border-t border-[#F1F4F8]">
+                          <p className="text-xs text-gray-400 font-bold">
+                            ID: #IPB-{report.laporan_id}
+                          </p>
+
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <button
+                              onClick={() => this.openDetailModal(report)}
+                              className="
+                                px-4
+                                py-2
+                                rounded-xl
+                                border
+                                border-[#D6E2F0]
+                                text-[#163A70]
+                                text-xs
+                                font-bold
+                                hover:bg-[#F5F7FB]
+                                transition-all
+                              "
+                            >
+                              Detail
+                            </button>
+
+                            {report.status_verifikasi === "belum_diverifikasi" && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    this.openApproveModal(report.laporan_id)
+                                  }
+                                  className="
+                                    px-4
+                                    py-2
+                                    rounded-xl
+                                    bg-[#163A70]
+                                    text-white
+                                    text-xs
+                                    font-bold
+                                    hover:bg-[#102348]
+                                    transition-all
+                                  "
+                                >
+                                  Setujui
+                                </button>
+
+                                <button
+                                  onClick={() =>
+                                    this.openRejectModal(report.laporan_id)
+                                  }
+                                  className="
+                                    px-4
+                                    py-2
+                                    rounded-xl
+                                    bg-[#FFF1F1]
+                                    text-[#D92D20]
+                                    text-xs
+                                    font-bold
+                                    hover:bg-[#FFE5E5]
+                                    transition-all
+                                  "
+                                >
+                                  Tolak
+                                </button>
+                              </>
+                            )}
+
+                            {report.status_verifikasi === "terverifikasi" && (
+                              <div className="
+                                px-4
+                                py-2
+                                rounded-xl
+                                bg-[#EEFDF3]
+                                text-[#0F9F4B]
+                                text-xs
+                                font-black
+                                text-center
+                              ">
+                                Sudah Diverifikasi
+                              </div>
+                            )}
+
+                            {report.status_verifikasi === "ditolak" && (
+                              <div className="
+                                px-4
+                                py-2
+                                rounded-xl
+                                bg-[#FFF1F1]
+                                text-[#D92D20]
+                                text-xs
+                                font-black
+                                text-center
+                              ">
+                                Ditolak
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+
+              {filteredReports.length > reportsPerPage && (
+                <div className="flex items-center justify-between gap-3 mt-8">
+                  <p className="text-xs text-gray-400 font-semibold">
+                    Menampilkan {startIndex + 1}-{Math.min(startIndex + reportsPerPage, filteredReports.length)} dari {filteredReports.length} laporan
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => this.setPage(Math.max(1, safeCurrentPage - 1))}
+                      disabled={safeCurrentPage === 1}
+                      className="px-4 py-2 rounded-xl border border-[#D6E2F0] text-xs font-bold text-[#163A70] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB]"
+                    >
+                      Sebelumnya
+                    </button>
+
+                    <div className="px-4 py-2 rounded-xl bg-[#F5F7FB] text-xs font-bold text-[#102348]">
+                      Halaman {safeCurrentPage} dari {totalPages}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, index) => {
+                        const pageNumber = index + 1;
+                        const isActive = pageNumber === safeCurrentPage;
+
+                        return (
+                          <button
+                            key={pageNumber}
+                            type="button"
+                            onClick={() => this.setPage(pageNumber)}
+                            className={`
+                              w-9
+                              h-9
+                              rounded-xl
+                              text-xs
+                              font-bold
+                              border
+                              transition-colors
+                              ${
+                                isActive
+                                  ? "bg-[#163A70] text-white border-[#163A70]"
+                                  : "bg-white text-[#163A70] border-[#D6E2F0] hover:bg-[#F5F7FB]"
+                              }
+                            `}
+                          >
+                            {pageNumber}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => this.setPage(Math.min(totalPages, safeCurrentPage + 1))}
+                      disabled={safeCurrentPage === totalPages}
+                      className="px-4 py-2 rounded-xl border border-[#D6E2F0] text-xs font-bold text-[#163A70] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB]"
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
+            )}
+              </>
+            )}
+
+            <PageFooter />
+          </main>
+        </div>
+
+        {this.renderDetailModal()}
+        {this.renderRejectModal()}
+        {this.renderApproveModal()}
+        {this.renderHandoverModal()}
+
+        {popup.show && (
+          <div
+            className={`
+              fixed top-6 right-6 z-[100]
+              px-5 py-4 rounded-2xl shadow-xl text-sm font-bold text-white
+              ${
+                popup.type === "success"
+                  ? "bg-[#16A34A]"
+                  : "bg-[#DC2626]"
+              }
+            `}
+          >
+            {popup.message}
+          </div>
+        )}
+      </div>
+    );
+  }
+}
+
+export default AdminVerificationPage;

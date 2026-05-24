@@ -89,6 +89,20 @@ class VerificationReportPage extends Component {
     }
   }
 
+  renderReportNumberColor(status) {
+    const normalizedStatus = (status || "").toLowerCase();
+
+    if (
+      ["menunggu", "diproses", "disetujui", "ditolak"].includes(
+        normalizedStatus
+      )
+    ) {
+      return "text-[#2563EB]";
+    }
+
+    return "text-[#0B2B5B]";
+  }
+
     renderBadgeColor(status) {
 
     if (!status) {
@@ -186,7 +200,7 @@ class VerificationReportPage extends Component {
           className={`
             flex-1 px-8 py-7
             transition-[margin] duration-300
-            ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+            ${this.state.isSidebarExpanded ? "ml-64" : "ml-16"}
           `}
         >
 
@@ -211,7 +225,7 @@ class VerificationReportPage extends Component {
           {loading ? (
 
             <div className="text-gray-500">
-              Loading...
+              Memuat...
             </div>
 
           ) : (
@@ -320,6 +334,14 @@ class VerificationReportPage extends Component {
                       </div>
 
                       {/* TITLE */}
+                      <p
+                        className={`text-[11px] font-extrabold mb-2 ${this.renderReportNumberColor(
+                          report.status_laporan
+                        )}`}
+                      >
+                        Laporan #{report.laporan_id}
+                      </p>
+
                       <h2 className="text-[18px] font-bold mb-2 capitalize">
                         {report.nama_barang}
                         
@@ -400,7 +422,7 @@ class VerificationReportPage extends Component {
                           <i className="fas fa-eye text-[11px]"></i>
 
                           <span>
-                            View Details
+                            Lihat Detail
                           </span>
 
                         </div>
@@ -881,11 +903,11 @@ class VerificationReportPage extends Component {
                 <div className="bg-[#0B2B5B] rounded-[30px] p-6 text-white">
 
                   <h2 className="text-[24px] font-bold mb-2">
-                    Pickup Key
+                    Kode Pengambilan
                   </h2>
 
                   <p className="text-[12px] text-gray-300 mb-5">
-                    Present after verification
+                    Ditampilkan setelah verifikasi
                   </p>
 
                   <div className="bg-white rounded-3xl h-40 flex items-center justify-center text-[#0B2B5B] font-bold text-sm">

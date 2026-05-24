@@ -10,7 +10,7 @@ const PageFooter = ({ className = "mt-16" }) => (
   >
     <span className="font-black text-[#002B5B]">NEMU IPB</span>
     <span>|</span>
-    <span>&copy; 2026 IPB University. All rights reserved.</span>
+    <span>&copy; 2026 IPB University. Seluruh hak cipta dilindungi.</span>
   </footer>
 );
 

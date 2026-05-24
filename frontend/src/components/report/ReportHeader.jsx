@@ -1,13 +1,15 @@
-// src/components/report/ReportHeader.jsx
-
 import React from "react";
 import FormStep from "../FormStep";
 
 const ReportHeader = ({
+  reportType,
   formData,
   selectedImage,
   sectionRefs,
 }) => {
+
+  const isPenemuan = reportType === "penemuan";
+
   return (
     <div className="bg-white rounded-[24px] border border-[#E7ECF3] p-6 mb-6 shadow-sm">
 
@@ -16,13 +18,15 @@ const ReportHeader = ({
         <div>
 
           <h1 className="text-4xl font-extrabold text-[#0B1F44] mb-2">
-            Pelaporan Kehilangan Barang
+            {isPenemuan
+              ? "Pelaporan Penemuan Barang"
+              : "Pelaporan Kehilangan Barang"}
           </h1>
 
           <p className="text-gray-500 text-sm max-w-3xl leading-relaxed">
-            Kejujuran Anda membantu menjaga integritas komunitas kami.
-            Mohon berikan deskripsi yang lengkap untuk membantu
-            mengembalikan barang ini kepada pemilik yang sebenarnya.
+            {isPenemuan
+              ? "Terima kasih telah membantu komunitas IPB. Mohon isi informasi barang yang ditemukan dengan lengkap agar pemilik dapat dikenali dengan mudah."
+              : "Kejujuran Anda membantu menjaga integritas komunitas kami. Mohon berikan deskripsi yang lengkap untuk membantu mengembalikan barang ini kepada pemilik yang sebenarnya."}
           </p>
 
         </div>
@@ -48,7 +52,11 @@ const ReportHeader = ({
         />
 
         <FormStep
-          title="Lokasi Kehilangan"
+          title={
+            isPenemuan
+              ? "Lokasi Penemuan"
+              : "Lokasi Kehilangan"
+          }
           className="px-2"
           completed={
             formData.lokasi &&

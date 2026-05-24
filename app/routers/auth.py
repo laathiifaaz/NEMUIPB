@@ -59,3 +59,41 @@ def login(user: UserLogin):
 
     finally:
         db.close()
+
+@router.patch("/users/{user_id}/toggle-status")
+def toggle_user_status(user_id: int):
+
+    db = SessionLocal()
+
+    user = (
+        db.query(User)
+        .filter(User.user_id == user_id)
+        .first()
+    )
+
+    if not user:
+
+        db.close()
+
+        raise HTTPException(
+            status_code=404,
+            detail="User tidak ditemukan"
+        )
+
+    user.status_akun = (
+        not user.status_akun
+    )
+
+    db.commit()
+
+    db.refresh(user)
+
+    db.close()
+
+    return {
+        "message":
+            "Status user berhasil diperbarui",
+
+        "status_akun":
+            user.status_akun
+    }

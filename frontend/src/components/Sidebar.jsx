@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+import GuidePopup from "./GuidePopup";
 
 const SidebarItem = ({
   icon,
@@ -11,12 +12,12 @@ const SidebarItem = ({
 }) => (
   <div
     onClick={onClick}
-    className={`
+  className={`
       flex
       items-center
-      justify-between
+      ${expanded ? "justify-between" : "justify-center"}
       h-14
-      px-4
+      ${expanded ? "px-4" : "px-0"}
       rounded-2xl
       cursor-pointer
       relative
@@ -25,26 +26,26 @@ const SidebarItem = ({
 
       ${
         active
-          ? "bg-[#163A70] text-white shadow-md shadow-blue-100"
-          : "text-gray-400 hover:bg-gray-50 hover:text-[#002B5B]"
+          ? "bg-[#163A70] text-white shadow-sm"
+          : "text-gray-500 hover:bg-[#EEF4FB] hover:text-[#002B5B]"
       }
     `}
   >
-    <div className="flex items-center">
+    <div className={`flex items-center ${expanded ? "" : "justify-center w-full"}`}>
       {/* ICON */}
-      <div className="w-4 flex justify-center flex-shrink-0">
+      <div className="w-5 flex justify-center flex-shrink-0">
         <i className={`fas ${icon}`}></i>
       </div>
 
       {/* TEXT */}
       <span
         className={`
-          ml-4
           font-bold
           text-sm
           whitespace-nowrap
-          ${expanded ? "opacity-100" : "opacity-0"}
-          transition-opacity duration-150
+          overflow-hidden
+          ${expanded ? "ml-4 max-w-40 opacity-100" : "ml-0 max-w-0 opacity-0"}
+          transition-all duration-150
         `}
       >
         {label}
@@ -71,7 +72,9 @@ class Sidebar extends Component {
 
     this.state = {
       expanded: false,
+      hoverExpanded: false,
       laporanDropdown: false,
+      showGuidePopup: false,
     };
   }
 
@@ -83,21 +86,24 @@ class Sidebar extends Component {
   }
 
   getExpanded() {
+    const hoverExpanded = this.state.hoverExpanded;
+
     if (typeof this.props.expanded === "boolean") {
-      return this.props.expanded;
+      return this.props.expanded || hoverExpanded;
     }
 
     if (typeof this.props.isSidebarExpanded === "boolean") {
-      return this.props.isSidebarExpanded;
+      return this.props.isSidebarExpanded || hoverExpanded;
     }
 
-    return this.state.expanded;
+    return this.state.expanded || hoverExpanded;
   }
 
   setHoverExpanded(expanded) {
-    if (!this.isControlledExpanded()) {
-      this.setState({ expanded });
-    }
+    this.setState({
+      hoverExpanded: expanded,
+      expanded: this.isControlledExpanded() ? this.state.expanded : expanded,
+    });
   }
 
   handleNavigate(path) {
@@ -107,9 +113,17 @@ class Sidebar extends Component {
   }
 
   render() {
-    const expanded = this.getExpanded();
-    const { laporanDropdown } = this.state;
-    const currentPath = this.props.currentPath || window.location.pathname;
+  const expanded = this.getExpanded();
+
+  const currentPath =
+    this.props.currentPath || window.location.pathname;
+
+  const autoOpenLaporan =
+    currentPath === "/lapor-kehilangan" ||
+    currentPath === "/lapor-penemuan";
+
+  const laporanDropdown =
+    this.state.laporanDropdown || autoOpenLaporan;
 
     return (
       <aside
@@ -122,25 +136,25 @@ class Sidebar extends Component {
           left-0
           h-screen
           z-50
-          ${expanded ? "w-64 px-4" : "w-0 px-0"}
-          bg-[#F8FAFC]
-          ${expanded ? "border-r" : "border-r-0"}
-          border-gray-100
+          ${expanded ? "w-64 px-4" : "w-16 px-2"}
+          bg-white
+          border-r
+          border-[#D9E2EF]
           flex
           flex-col
           py-8
-          shadow-sm
+          shadow-[4px_0_24px_rgba(15,39,71,0.06)]
           overflow-x-hidden
-          ${expanded ? "pointer-events-auto" : "pointer-events-none"}
+          pointer-events-auto
           transition-[width,padding] duration-300
         `}
       >
         {/* LOGO */}
-        <div className="flex items-center gap-4 mb-12 px-2">
+        <div className="flex items-center gap-4 mb-12 px-1">
           <img
             src="/images/logo-nemuipb.png"
             alt="Logo"
-            className="w-12 h-12 object-contain transition-all duration-300 flex-shrink-0"
+            className="w-14 h-14 object-contain transition-all duration-300 flex-shrink-0"
           />
 
           <div
@@ -152,12 +166,12 @@ class Sidebar extends Component {
           >
             <h1
               onClick={() => this.handleNavigate("/dashboard")}
-              className="font-bold text-[#002B5B] text-lg leading-none cursor-pointer"
+              className="font-extrabold text-[#002B5B] text-xl leading-none cursor-pointer"
             >
               NEMU IPB
             </h1>
 
-            <p className="text-[10px] text-gray-400 font-bold tracking-tight">
+            <p className="text-xs text-[#56708F] font-extrabold tracking-tight mt-1">
               IPB LOST & FOUND
             </p>
           </div>
@@ -195,13 +209,6 @@ class Sidebar extends Component {
             />
           </div>
 
-          {/* ANALITIK */}
-          <SidebarItem
-            icon="fa-chart-bar"
-            label="Analitik"
-            expanded={expanded}
-          />
-
           {/* DROPDOWN LAPORAN */}
           <SidebarItem
             icon="fa-file-alt"
@@ -211,7 +218,7 @@ class Sidebar extends Component {
             dropdownOpen={laporanDropdown}
             active={
               currentPath === "/lapor-kehilangan" ||
-              currentPath === "/laporan-penemuan"
+              currentPath === "/lapor-penemuan"
             }
             onClick={() =>
               this.setState({
@@ -230,8 +237,8 @@ class Sidebar extends Component {
                   flex items-center px-4 py-3 rounded-xl cursor-pointer text-sm font-semibold transition-all
                   ${
                     currentPath === "/lapor-kehilangan"
-                      ? "bg-[#163A70] text-white shadow-md shadow-blue-100"
-                      : "text-gray-500 hover:bg-gray-100 hover:text-[#002B5B]"
+                      ? "bg-[#163A70] text-white shadow-sm"
+                      : "text-gray-500 hover:bg-[#EEF4FB] hover:text-[#002B5B]"
                   }
                 `}
               >
@@ -245,8 +252,8 @@ class Sidebar extends Component {
                   flex items-center px-4 py-3 rounded-xl cursor-pointer text-sm font-semibold transition-all
                   ${
                     currentPath === "/lapor-penemuan"
-                      ? "bg-[#163A70] text-white shadow-md shadow-blue-100"
-                      : "text-gray-500 hover:bg-gray-100 hover:text-[#002B5B]"
+                      ? "bg-[#163A70] text-white shadow-sm"
+                      : "text-gray-500 hover:bg-[#EEF4FB] hover:text-[#002B5B]"
                   }
                 `}
               >
@@ -261,16 +268,19 @@ class Sidebar extends Component {
         {/* FOOTER */}
         <div className="mt-auto flex flex-col gap-2">
           {/* PANDUAN */}
-          <div className="flex items-center h-12 px-4 text-gray-400 hover:text-[#002B5B] cursor-pointer">
-            <div className="w-4 flex justify-center flex-shrink-0">
+          <div
+            onClick={() => this.setState({ showGuidePopup: true })}
+            className={`flex items-center h-12 rounded-2xl text-gray-500 hover:text-[#002B5B] hover:bg-[#EEF4FB] cursor-pointer transition-colors ${expanded ? "px-4" : "justify-center px-0"}`}
+          >
+            <div className="w-5 flex justify-center flex-shrink-0">
               <i className="far fa-question-circle text-xl"></i>
             </div>
 
             <span
               className={`
-                font-bold text-sm ml-3
-                transition-opacity duration-200
-                ${expanded ? "opacity-100" : "opacity-0"}
+                font-bold text-sm whitespace-nowrap overflow-hidden
+                transition-all duration-200
+                ${expanded ? "ml-3 max-w-32 opacity-100" : "ml-0 max-w-0 opacity-0"}
               `}
             >
               Panduan
@@ -281,23 +291,28 @@ class Sidebar extends Component {
           {/* LOGOUT */}
           <button
             onClick={this.props.handleLogout}
-            className="flex items-center h-12 w-full px-4 bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors"
+            className={`flex items-center h-12 w-full bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors ${expanded ? "px-4" : "justify-center px-0"}`}
           >
-            <div className="w-4 flex justify-center flex-shrink-0">
+            <div className="w-5 flex justify-center flex-shrink-0">
               <i className="fas fa-sign-out-alt text-[14px]"></i>
             </div>
 
             <span
               className={`
-                font-bold text-sm ml-3
-                transition-opacity duration-200
-                ${expanded ? "opacity-100" : "opacity-0"}
+                font-bold text-sm whitespace-nowrap overflow-hidden
+                transition-all duration-200
+                ${expanded ? "ml-3 max-w-32 opacity-100" : "ml-0 max-w-0 opacity-0"}
               `}
             >
               Keluar
             </span>
           </button>
         </div>
+
+        <GuidePopup
+          open={this.state.showGuidePopup}
+          onClose={() => this.setState({ showGuidePopup: false })}
+        />
       </aside>
     );
   }

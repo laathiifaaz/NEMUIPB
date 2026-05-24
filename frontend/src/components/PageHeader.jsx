@@ -1,5 +1,280 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import AuthService from "../services/AuthService";
+import NotifikasiService from "../services/NotifikasiService";
+import AdminService from "../services/AdminService";
+import ReportService from "../services/ReportService";
+
+const formatNotificationDate = (value) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const NotificationBell = ({ navigate }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const dropdownRef = useRef(null);
+  const currentUser = AuthService.getCurrentUser();
+  const isAdmin = currentUser?.role === "admin";
+
+  const unreadCount = useMemo(
+    () =>
+      isAdmin
+        ? notifications.reduce((total, item) => total + (item.count || 0), 0)
+        : notifications.filter((item) => !item.status_baca).length,
+    [notifications, isAdmin]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchNotifications = async () => {
+      try {
+        if (isAdmin) {
+          const [reportsData, claimsData] = await Promise.all([
+            AdminService.getAllReports(),
+            AdminService.getPendingClaims(),
+          ]);
+
+          const pendingReports = (Array.isArray(reportsData) ? reportsData : [])
+            .filter((report) => report.status_verifikasi === "belum_diverifikasi");
+          const pendingClaims = Array.isArray(claimsData) ? claimsData : [];
+          const lostCount = pendingReports.filter(
+            (report) => report.jenis_laporan === "kehilangan"
+          ).length;
+          const foundCount = pendingReports.filter(
+            (report) => report.jenis_laporan === "penemuan"
+          ).length;
+
+          const adminNotifications = [
+            {
+              id: "admin-lost",
+              synthetic: true,
+              count: lostCount,
+              title: "Laporan kehilangan baru",
+              message: `${lostCount} laporan kehilangan menunggu verifikasi`,
+              icon: "fa-search-minus",
+              path: "/admin/verifikasi",
+            },
+            {
+              id: "admin-found",
+              synthetic: true,
+              count: foundCount,
+              title: "Laporan penemuan baru",
+              message: `${foundCount} laporan penemuan menunggu verifikasi`,
+              icon: "fa-search-plus",
+              path: "/admin/verifikasi",
+            },
+            {
+              id: "admin-claims",
+              synthetic: true,
+              count: pendingClaims.length,
+              title: "Klaim barang baru",
+              message: `${pendingClaims.length} klaim barang menunggu verifikasi`,
+              icon: "fa-handshake",
+              path: "/admin/verifikasi",
+            },
+          ];
+
+          if (isMounted) {
+            setNotifications(adminNotifications);
+            setLoading(false);
+          }
+
+          return;
+        }
+
+        const data = await NotifikasiService.getNotifikasi();
+        const enrichedNotifications = await Promise.all(
+          (Array.isArray(data) ? data : []).map(async (notification) => {
+            if (!notification.laporan_id) return notification;
+
+            const detail = await ReportService.getReportDetail(
+              notification.laporan_id
+            );
+            const barang = detail?.barang;
+
+            return {
+              ...notification,
+              judul_laporan: barang?.nama_barang || `Laporan #${notification.laporan_id}`,
+              tanggal_laporan: barang?.tanggal_kejadian || detail?.tanggal_verifikasi,
+              jenis_laporan: detail?.jenis_laporan,
+            };
+          })
+        );
+
+        if (isMounted) {
+          setNotifications(enrichedNotifications);
+          setLoading(false);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setNotifications([]);
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchNotifications();
+    const intervalId = window.setInterval(fetchNotifications, 30000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
+
+  const handleRead = async (notification) => {
+    if (notification.synthetic) {
+      if (notification.path && navigate) {
+        navigate(notification.path);
+        setIsOpen(false);
+      }
+
+      return;
+    }
+
+    if (!notification.status_baca) {
+      setNotifications((current) =>
+        current.map((item) =>
+          item.notifikasi_id === notification.notifikasi_id
+            ? { ...item, status_baca: true }
+            : item
+        )
+      );
+
+      try {
+        await NotifikasiService.markAsRead(notification.notifikasi_id);
+      } catch (error) {
+        setNotifications((current) =>
+          current.map((item) =>
+            item.notifikasi_id === notification.notifikasi_id
+              ? { ...item, status_baca: false }
+              : item
+          )
+        );
+      }
+    }
+
+    if (notification.laporan_id && navigate) {
+      navigate("/verifikasi");
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((value) => !value)}
+        className="relative w-11 h-11 rounded-2xl bg-white border border-gray-100 text-[#0B2B5B] hover:bg-blue-50 transition-colors shadow-sm"
+        aria-label="Buka notifikasi"
+      >
+        <i className="far fa-bell text-sm"></i>
+
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#2563EB] text-white text-[10px] font-bold flex items-center justify-center">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-14 w-[min(360px,calc(100vw-2rem))] bg-white border border-gray-100 rounded-2xl shadow-2xl shadow-slate-900/10 z-50 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-extrabold text-[#0B2B5B]">
+                Notifikasi
+              </h2>
+              <p className="text-[11px] text-gray-400">
+                {unreadCount} belum dibaca
+              </p>
+            </div>
+
+            <i className="fas fa-inbox text-blue-500 text-sm"></i>
+          </div>
+
+          <div className="max-h-96 overflow-y-auto">
+            {loading ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">
+                Memuat notifikasi...
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">
+                Belum ada notifikasi.
+              </div>
+            ) : (
+              notifications.map((notification) => (
+                <button
+                  key={notification.notifikasi_id || notification.id}
+                  type="button"
+                  onClick={() => handleRead(notification)}
+                  className={`w-full text-left px-5 py-4 border-b border-gray-50 last:border-b-0 hover:bg-blue-50/70 transition-colors ${
+                    notification.status_baca || notification.synthetic
+                      ? "bg-white"
+                      : "bg-blue-50/60"
+                  }`}
+                >
+                  <div className="flex gap-3">
+                    <span
+                      className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                        notification.status_baca
+                          ? "bg-gray-200"
+                          : "bg-[#2563EB]"
+                      }`}
+                    ></span>
+
+                    <span className="min-w-0">
+                      <span className="block text-xs font-extrabold text-[#0B2B5B] leading-relaxed">
+                        {notification.title || notification.judul_laporan || notification.pesan}
+                      </span>
+                      <span className="block text-[11px] text-gray-500 mt-1 leading-relaxed">
+                        {notification.synthetic ? notification.message : notification.pesan}
+                      </span>
+                      <span className="block text-[10px] text-gray-400 mt-1">
+                        {notification.synthetic
+                          ? notification.count > 0
+                            ? "Perlu ditinjau"
+                            : "Tidak ada item baru"
+                          : `${notification.jenis_laporan ? `${notification.jenis_laporan} - ` : ""}${formatNotificationDate(notification.tanggal_laporan || notification.tanggal_kirim)}`}
+                      </span>
+                    </span>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PageHeader = ({
   onToggleSidebar,
@@ -46,6 +321,8 @@ const PageHeader = ({
         )}
 
         {actions}
+
+        <NotificationBell navigate={navigate} />
 
         {showProfile && (
           <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100">

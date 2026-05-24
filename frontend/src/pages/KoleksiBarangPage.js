@@ -185,9 +185,10 @@ class KoleksiBarangPage extends Component {
 
   getItemImage(item) {
     if (item.foto_url) return item.foto_url;
+    if (item.dokumentasi?.startsWith("data:image/")) return item.dokumentasi;
     if (item.dokumentasi?.startsWith("http")) return item.dokumentasi;
     if (item.dokumentasi?.startsWith("/")) return item.dokumentasi;
-    if (item.dokumentasi) return `/assets/images/${item.dokumentasi}`;
+    if (item.dokumentasi) return `/images/${item.dokumentasi}`;
 
     return "/images/logo-ipb.png";
   }
@@ -227,7 +228,7 @@ class KoleksiBarangPage extends Component {
           className={`
             flex-1 px-6 md:px-12 py-8 overflow-y-auto
             transition-[margin] duration-300
-            ${isSidebarExpanded ? "ml-64" : "ml-0"}
+            ${isSidebarExpanded ? "ml-64" : "ml-16"}
           `}
         >
           <PageHeader

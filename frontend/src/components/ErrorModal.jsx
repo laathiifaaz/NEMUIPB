@@ -12,7 +12,7 @@ const ErrorModal = ({ show, message, onClose }) => {
         </div>
 
         <h2 className="text-lg font-bold text-[#002B5B] mb-2">
-          Login Gagal
+          Masuk Gagal
         </h2>
 
         <p className="text-sm text-gray-500 mb-6">

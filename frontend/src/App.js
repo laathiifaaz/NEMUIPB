@@ -3,10 +3,14 @@ import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import LostReportPage from "./pages/LostReportPage.jsx";
+import FindReportPage from "./pages/FindReportPage";
 import VerificationReportPage from "./pages/VerificationReportPage.jsx";
 import AdminBarangPage from "./pages/AdminBarangPage.jsx";
+import AdminVerificationPage from "./pages/AdminVerificationPage";
 import KoleksiBarangPage from "./pages/KoleksiBarangPage.js";
 import AuthService from "./services/AuthService";
+import UserManagementPage from "./pages/UserManagementPage";
+
 
 class App extends Component {
   constructor(props) {
@@ -96,6 +100,10 @@ class App extends Component {
       );
     }
 
+    if (currentPath === "/lapor-penemuan") {
+    return <FindReportPage navigate={this.navigate} />;
+  }
+
     // Admin barang
     if (currentPath === "/admin/barang") {
       if (user.role !== "admin") {
@@ -104,6 +112,32 @@ class App extends Component {
 
       return <AdminBarangPage navigate={this.navigate} />;
     }
+
+    // User Management
+    if (currentPath === "/admin/users") {
+      if (user.role !== "admin") {
+        return <DashboardPage navigate={this.navigate} />;
+      }
+
+      return <UserManagementPage navigate={this.navigate} />;
+    }
+
+    if (currentPath === "/admin/verifikasi") {
+
+    if (user.role !== "admin") {
+      return (
+        <DashboardPage
+          navigate={this.navigate}
+        />
+      );
+    }
+
+    return (
+      <AdminVerificationPage
+        navigate={this.navigate}
+      />
+    );
+  }
 
     // fallback
     return <DashboardPage navigate={this.navigate} />;

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy import or_
 
 from app.database import SessionLocal
-from app.models import Barang
+from app.models import Barang, Laporan
 
 router = APIRouter(
     prefix="/barang",
@@ -15,7 +15,30 @@ router = APIRouter(
 def get_all_barang():
     db = SessionLocal()
 
-    barang = db.query(Barang).all()
+    data = (
+        db.query(Barang, Laporan)
+        .outerjoin(Laporan, Laporan.barang_id == Barang.barang_id)
+        .order_by(Laporan.laporan_id.desc().nullslast(), Barang.barang_id.desc())
+        .all()
+    )
+
+    barang = [
+        {
+            "barang_id": item.barang_id,
+            "laporan_id": laporan.laporan_id if laporan else None,
+            "jenis_laporan": laporan.jenis_laporan if laporan else None,
+            "status_laporan": laporan.status_laporan if laporan else None,
+            "status_verifikasi": laporan.status_verifikasi if laporan else None,
+            "nama_barang": item.nama_barang,
+            "kategori": item.kategori,
+            "deskripsi": item.deskripsi,
+            "tanggal_kejadian": item.tanggal_kejadian,
+            "lokasi": item.lokasi,
+            "dokumentasi": item.dokumentasi,
+            "status_barang": item.status_barang,
+        }
+        for item, laporan in data
+    ]
 
     db.close()
     return barang

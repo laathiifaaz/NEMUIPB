@@ -1,7 +1,17 @@
 import React, { Component } from "react";
 import AuthService from "../../services/AuthService";
+import GuidePopup from "../GuidePopup";
 
 class AdminSidebar extends Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      hoverExpanded: false,
+      showGuidePopup: false,
+    };
+  }
+
   handleLogout = () => {
     AuthService.logout();
     window.location.href = "/";
@@ -16,43 +26,44 @@ class AdminSidebar extends Component {
   }
 
   renderItem(icon, label, activeKey, path) {
-    const { activeMenu, expanded } = this.props;
+    const { activeMenu } = this.props;
+    const expanded = this.getExpanded();
     const isActive = activeMenu === activeKey;
 
     return (
       <div
         onClick={() => this.handleNavigate(path)}
         className={`
-          flex
-          items-center
-          justify-between
-          h-14
-          px-4
-          rounded-2xl
+      flex
+      items-center
+      ${expanded ? "justify-between" : "justify-center"}
+      h-14
+      ${expanded ? "px-4" : "px-0"}
+      rounded-2xl
           cursor-pointer
           relative
           overflow-hidden
           transition-colors duration-200
           ${
           isActive
-            ? "bg-[#163A70] text-white shadow-md shadow-blue-100"
-            : "text-gray-400 hover:bg-gray-50 hover:text-[#002B5B]"
+            ? "bg-[#163A70] text-white shadow-sm"
+            : "text-gray-500 hover:bg-[#EEF4FB] hover:text-[#002B5B]"
           }
         `}
       >
-        <div className="flex items-center">
-          <div className="w-4 flex justify-center flex-shrink-0">
+        <div className={`flex items-center ${expanded ? "" : "justify-center w-full"}`}>
+          <div className="w-5 flex justify-center flex-shrink-0">
             <i className={`fas ${icon}`}></i>
           </div>
 
           <span
             className={`
-              ml-4
               font-bold
               text-sm
               whitespace-nowrap
-              ${expanded ? "opacity-100" : "opacity-0"}
-              transition-opacity duration-150
+              overflow-hidden
+              ${expanded ? "ml-4 max-w-40 opacity-100" : "ml-0 max-w-0 opacity-0"}
+              transition-all duration-150
             `}
           >
             {label}
@@ -62,36 +73,42 @@ class AdminSidebar extends Component {
     );
   }
 
+  getExpanded() {
+    return Boolean(this.props.expanded || this.state.hoverExpanded);
+  }
+
   render() {
-    const { expanded = true } = this.props;
+    const expanded = this.getExpanded();
 
     return (
       <aside
         aria-hidden={!expanded}
+        onMouseEnter={() => this.setState({ hoverExpanded: true })}
+        onMouseLeave={() => this.setState({ hoverExpanded: false })}
         className={`
           fixed
           top-0
           left-0
           h-screen
           z-50
-          ${expanded ? "w-64 px-4" : "w-0 px-0"}
-          bg-[#F8FAFC]
-          ${expanded ? "border-r" : "border-r-0"}
-          border-gray-100
+          ${expanded ? "w-64 px-4" : "w-16 px-2"}
+          bg-white
+          border-r
+          border-[#D9E2EF]
           flex
           flex-col
           py-8
-          shadow-sm
+          shadow-[4px_0_24px_rgba(15,39,71,0.06)]
           overflow-x-hidden
-          ${expanded ? "pointer-events-auto" : "pointer-events-none"}
+          pointer-events-auto
           transition-[width,padding] duration-300
         `}
       >
-        <div className="flex items-center gap-4 mb-12 px-2">
+        <div className="flex items-center gap-4 mb-12 px-1">
           <img
             src="/images/logo-nemuipb.png"
             alt="Logo"
-            className="w-12 h-12 object-contain transition-all duration-300 flex-shrink-0"
+            className="w-14 h-14 object-contain transition-all duration-300 flex-shrink-0"
           />
 
           <div
@@ -101,10 +118,10 @@ class AdminSidebar extends Component {
               ${expanded ? "opacity-100" : "opacity-0"}
             `}
           >
-            <h1 className="font-bold text-[#002B5B] text-lg leading-none">
+            <h1 className="font-extrabold text-[#002B5B] text-xl leading-none">
               NEMU IPB
             </h1>
-            <p className="text-[10px] text-gray-400 font-bold tracking-tight">
+            <p className="text-xs text-[#56708F] font-extrabold tracking-tight mt-1">
               IPB LOST & FOUND
             </p>
           </div>
@@ -113,24 +130,35 @@ class AdminSidebar extends Component {
         <nav className="flex flex-col gap-2">
           {this.renderItem("fa-th-large", "Beranda", "dashboard", "/admin")}
           {this.renderItem("fa-box", "Koleksi Barang", "barang", "/admin/barang")}
-          {this.renderItem("fa-check-circle", "Verifikasi", "verifikasi", "/admin")}
+          {this.renderItem(
+            "fa-check-circle",
+            "Verifikasi",
+            "verification",
+            "/admin/verifikasi"
+          )}
           {this.renderItem("fa-chart-bar", "Analitik", "analitik", "/admin")}
-          {this.renderItem("fa-users", "User Management", "users", "/admin")}
+          {this.renderItem(
+            "fa-users",
+            "Daftar Admin",
+            "users",
+            "/admin/users"
+          )}
         </nav>
 
         <div className="mt-auto flex flex-col gap-2">
           <div
-            className="flex items-center h-12 px-4 text-gray-400 hover:text-[#002B5B] cursor-pointer"
+            onClick={() => this.setState({ showGuidePopup: true })}
+            className={`flex items-center h-12 rounded-2xl text-gray-500 hover:text-[#002B5B] hover:bg-[#EEF4FB] cursor-pointer transition-colors ${expanded ? "px-4" : "justify-center px-0"}`}
           >
-            <div className="w-4 flex justify-center flex-shrink-0">
+            <div className="w-5 flex justify-center flex-shrink-0">
               <i className="far fa-question-circle text-xl"></i>
             </div>
 
             <span
               className={`
-                font-bold text-sm ml-3
-                transition-opacity duration-200
-                ${expanded ? "opacity-100" : "opacity-0"}
+                font-bold text-sm whitespace-nowrap overflow-hidden
+                transition-all duration-200
+                ${expanded ? "ml-3 max-w-32 opacity-100" : "ml-0 max-w-0 opacity-0"}
               `}
             >
               Panduan
@@ -139,23 +167,29 @@ class AdminSidebar extends Component {
 
           <button
             onClick={this.handleLogout}
-            className="flex items-center h-12 w-full px-4 bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors"
+            className={`flex items-center h-12 w-full bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors ${expanded ? "px-4" : "justify-center px-0"}`}
           >
-            <div className="w-4 flex justify-center flex-shrink-0">
+            <div className="w-5 flex justify-center flex-shrink-0">
               <i className="fas fa-sign-out-alt text-[14px]"></i>
             </div>
 
             <span
               className={`
-                font-bold text-sm ml-3
-                transition-opacity duration-200
-                ${expanded ? "opacity-100" : "opacity-0"}
+                font-bold text-sm whitespace-nowrap overflow-hidden
+                transition-all duration-200
+                ${expanded ? "ml-3 max-w-32 opacity-100" : "ml-0 max-w-0 opacity-0"}
               `}
             >
               Keluar
             </span>
           </button>
         </div>
+
+        <GuidePopup
+          open={this.state.showGuidePopup}
+          variant="admin"
+          onClose={() => this.setState({ showGuidePopup: false })}
+        />
       </aside>
     );
   }

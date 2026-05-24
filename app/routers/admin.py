@@ -37,6 +37,7 @@ def get_all_laporan(
         db.query(Laporan, Barang, User)
         .join(Barang, Laporan.barang_id == Barang.barang_id)
         .join(User, Laporan.user_id == User.user_id)
+        .order_by(Laporan.laporan_id.desc())
         .all()
     )
 
@@ -51,7 +52,10 @@ def get_all_laporan(
             "status_verifikasi": laporan.status_verifikasi,
             "nama_barang": barang.nama_barang,
             "kategori": barang.kategori,
+            "deskripsi": barang.deskripsi,
             "lokasi": barang.lokasi,
+            "dokumentasi": barang.dokumentasi,
+            "tanggal_kejadian": barang.tanggal_kejadian,
             "status_barang": barang.status_barang
         })
 

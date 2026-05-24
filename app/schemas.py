@@ -6,6 +6,13 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class UserCreate(BaseModel):
+    nama: str
+    email: str
+    no_hp: str
+    identitas: str
+    role: str
+    password: str
 
 class LaporanCreate(BaseModel):
     nama_barang: str
@@ -35,12 +42,22 @@ class LaporanCreate(BaseModel):
         if value is None or value.strip() == "":
             return value
 
-        allowed_extensions = [".jpg", ".jpeg", ".png", ".webp"]
+        normalized_value = value.lower()
 
-        if not any(value.lower().endswith(ext) for ext in allowed_extensions):
+        if normalized_value.startswith("data:image/"):
+            allowed_prefixes = [
+                "data:image/jpg;base64,",
+                "data:image/jpeg;base64,",
+                "data:image/png;base64,",
+                "data:image/webp;base64,",
+            ]
+
+            if any(normalized_value.startswith(prefix) for prefix in allowed_prefixes):
+                return value
+
             raise ValueError("Format dokumentasi harus jpg, jpeg, png, atau webp")
 
-        return value
+        raise ValueError("Dokumentasi harus berupa file gambar hasil upload")
 
 
 class VerifikasiLaporan(BaseModel):

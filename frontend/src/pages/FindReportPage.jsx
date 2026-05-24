@@ -3,17 +3,18 @@ import Sidebar from "../components/Sidebar";
 import AuthService from "../services/AuthService";
 import PageHeader from "../components/PageHeader";
 import PageFooter from "../components/PageFooter";
+import { API_BASE_URL } from "../config/api";
+
 import {
   getStoredSidebarExpanded,
   setStoredSidebarExpanded,
 } from "../utils/sidebarState";
-import { API_BASE_URL } from "../config/api";
 
 import ReportHeader from "../components/report/ReportHeader";
 import ReportFormSection from "../components/report/ReportFormSection";
 import ReportModals from "../components/report/ReportModals";
 
-class LostReportPage extends Component {
+class FindReportPage extends Component {
   constructor(props) {
     super(props);
 
@@ -209,66 +210,69 @@ class LostReportPage extends Component {
     });
   };
 
-  handleSubmit = async () => {
-    try {
-      const token = AuthService.getToken();
+handleSubmit = async () => {
+  try {
 
-      if (!token) {
-        alert("Session login habis");
-        return;
-      }
-      const currentUser = AuthService.getCurrentUser();
-      const dokumentasi = await this.readImageAsDataUrl(
-        this.state.selectedImage
-      );
+    const token = AuthService.getToken();
 
-      if (!dokumentasi.startsWith("data:image/")) {
-        alert("Gagal membaca gambar. Silakan pilih ulang file gambar.");
-        return;
-      }
-
-      const payload = {
-        user_id: currentUser.user_id,
-
-        nama_barang: this.state.formData.nama_barang,
-        kategori: this.state.formData.kategori,
-        deskripsi: this.state.formData.deskripsi,
-        lokasi: this.state.formData.lokasi,
-        tanggal_kejadian: this.state.formData.tanggal_kejadian,
-
-        dokumentasi,
-      };
-
-      const response = await fetch(
-        `${API_BASE_URL}/laporan/kehilangan`,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert("ERROR: " + JSON.stringify(data));
-        return;
-      }
-
-      this.setState({
-        reportSubmitted: true,
-        showSubmitModal: false,
-      });
-    } catch (error) {
-      console.error(error);
-      alert(JSON.stringify(error));
+    if (!token) {
+      alert("Session login habis");
+      return;
     }
-  };
+
+    const currentUser = AuthService.getCurrentUser();
+    const dokumentasi = await this.readImageAsDataUrl(
+      this.state.selectedImage
+    );
+
+    if (!dokumentasi.startsWith("data:image/")) {
+      alert("Gagal membaca gambar. Silakan pilih ulang file gambar.");
+      return;
+    }
+
+    const payload = {
+      user_id: currentUser.user_id,
+
+      nama_barang: this.state.formData.nama_barang,
+      kategori: this.state.formData.kategori,
+      deskripsi: this.state.formData.deskripsi,
+      lokasi: this.state.formData.lokasi,
+      tanggal_kejadian: this.state.formData.tanggal_kejadian,
+
+      dokumentasi,
+    };
+
+    const response = await fetch(
+      `${API_BASE_URL}/laporan/penemuan`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert("ERROR: " + JSON.stringify(data));
+      return;
+    }
+
+    this.setState({
+      reportSubmitted: true,
+      showSubmitModal: false,
+    });
+
+  } catch (error) {
+    console.error(error);
+    alert(JSON.stringify(error));
+  }
+};
 
   handleLogout = () => {
     localStorage.clear();
@@ -297,7 +301,7 @@ class LostReportPage extends Component {
           </h2>
 
           <p className="text-sm text-gray-500 leading-relaxed mb-8">
-            Laporan kehilangan kamu sudah masuk dan akan diproses oleh admin.
+            Laporan penemuan kamu sudah masuk dan akan diproses oleh admin.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -332,19 +336,19 @@ class LostReportPage extends Component {
 
         <Sidebar
           expanded={this.state.isSidebarExpanded}
-          currentPath="/lapor-kehilangan"
+          currentPath="/lapor-penemuan"
           handleLogout={this.handleLogout}
           navigate={this.props.navigate}
         />
 
         <main
-          className={`
+        className={`
             flex-1
             px-6 md:px-12 py-8
             overflow-y-auto
             transition-[margin] duration-300
             ${this.state.isSidebarExpanded ? "ml-64" : "ml-16"}
-          `}
+        `}
         >
 
           <PageHeader
@@ -360,14 +364,14 @@ class LostReportPage extends Component {
           ) : (
             <>
               <ReportHeader
-                reportType="kehilangan"
                 formData={this.state.formData}
                 selectedImage={this.state.selectedImage}
                 sectionRefs={this.sectionRefs}
+                reportType="penemuan"
               />
 
               <ReportFormSection
-                reportType="kehilangan"
+                reportType="penemuan"
                 formData={this.state.formData}
                 errors={this.state.errors}
                 selectedImage={this.state.selectedImage}
@@ -402,4 +406,4 @@ class LostReportPage extends Component {
   }
 }
 
-export default LostReportPage;
+export default FindReportPage;

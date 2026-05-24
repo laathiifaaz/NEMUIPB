@@ -139,7 +139,6 @@ class AdminBarangPage extends Component {
   getActionClass(actionType) {
     if (actionType === "verified") return "bg-green-100 text-green-700";
     if (actionType === "rejected") return "bg-red-100 text-red-700";
-    if (actionType === "status_updated") return "bg-blue-100 text-[#002B5B]";
     if (actionType === "returned") return "bg-[#F4D35E] text-[#5C4A00]";
     if (actionType === "claim_pending") return "bg-purple-100 text-purple-700";
 
@@ -171,7 +170,7 @@ class AdminBarangPage extends Component {
             className={`
               flex-1 p-6 md:p-10 overflow-y-auto
               transition-[margin] duration-300
-              ${this.state.isSidebarExpanded ? "ml-64" : "ml-0"}
+              ${this.state.isSidebarExpanded ? "ml-64" : "ml-16"}
             `}
           >
             <PageHeader
@@ -185,7 +184,7 @@ class AdminBarangPage extends Component {
                     className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
                   >
                     <i className="fas fa-user mr-2"></i>
-                    Mode User
+                    Mode Pengguna
                   </button>
 
                   <button
@@ -194,7 +193,7 @@ class AdminBarangPage extends Component {
                     className="bg-gray-100 text-[#002B5B] px-5 py-3 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all"
                   >
                     <i className="fas fa-download mr-2"></i>
-                    Export CSV
+                    Ekspor CSV
                   </button>
                 </>
               }
@@ -212,7 +211,7 @@ class AdminBarangPage extends Component {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase">
-                    Action Type
+                    Jenis Aktivitas
                   </label>
 
                   <select
@@ -222,17 +221,16 @@ class AdminBarangPage extends Component {
                     className="w-full mt-2 bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none"
                   >
                     <option value="semua">Semua Aktivitas</option>
-                    <option value="verified">Verified</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="status_updated">Status Updated</option>
-                    <option value="claim_pending">Claim Pending</option>
-                    <option value="returned">Returned</option>
+                    <option value="verified">Terverifikasi</option>
+                    <option value="rejected">Ditolak</option>
+                    <option value="claim_pending">Klaim Menunggu</option>
+                    <option value="returned">Dikembalikan</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase">
-                    Sort
+                    Urutan
                   </label>
 
                   <select
@@ -241,8 +239,8 @@ class AdminBarangPage extends Component {
                     onChange={this.handleChange}
                     className="w-full mt-2 bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none"
                   >
-                    <option value="newest">Newest</option>
-                    <option value="oldest">Oldest</option>
+                    <option value="newest">Terbaru</option>
+                    <option value="oldest">Terlama</option>
                   </select>
                 </div>
 
@@ -265,18 +263,18 @@ class AdminBarangPage extends Component {
               )}
 
               {isLoading ? (
-                <p className="text-gray-400 text-sm">Loading logs...</p>
+                <p className="text-gray-400 text-sm">Memuat log...</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-[10px] text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                        <th className="text-left py-4">Item ID</th>
-                        <th className="text-left py-4">Item Name</th>
-                        <th className="text-left py-4">Action</th>
+                        <th className="text-left py-4">ID Barang</th>
+                        <th className="text-left py-4">Nama Barang</th>
+                        <th className="text-left py-4">Aktivitas</th>
                         <th className="text-left py-4">Administrator</th>
-                        <th className="text-left py-4">Note</th>
-                        <th className="text-left py-4">Timestamp</th>
+                        <th className="text-left py-4">Catatan</th>
+                        <th className="text-left py-4">Waktu</th>
                       </tr>
                     </thead>
 
@@ -305,7 +303,7 @@ class AdminBarangPage extends Component {
                           </td>
 
                           <td className="py-5 text-gray-500">
-                            {log.administrator || "System"}
+                            {log.administrator || "Sistem"}
                           </td>
 
                           <td className="py-5 text-gray-500 max-w-md">
@@ -323,7 +321,7 @@ class AdminBarangPage extends Component {
               )}
 
               <div className="flex justify-between items-center mt-8 text-xs text-gray-500">
-                <p>Showing {logs.length} logs</p>
+                <p>Menampilkan {logs.length} log</p>
               </div>
             </section>
 

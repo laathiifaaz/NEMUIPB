@@ -40,6 +40,24 @@ class ReportService {
     }
   }
 
+  async getReportDetail(laporanId) {
+    try {
+      const response = await fetch(`${this.baseUrl}/laporan/${laporanId}`, {
+        method: "GET",
+        headers: AuthService.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error("Gagal mengambil detail laporan");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  }
+
   // TARUH DI SINI
   async createLostReport(formData) {
 

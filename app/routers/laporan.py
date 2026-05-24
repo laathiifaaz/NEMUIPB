@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy import func
 from app.utils.security import get_current_user
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan
@@ -28,11 +29,8 @@ def buat_laporan_kehilangan(
         db.query(Laporan)
         .join(Barang, Laporan.barang_id == Barang.barang_id)
         .filter(
-            Laporan.user_id == current_user.user_id,
             Laporan.jenis_laporan == "kehilangan",
-            Barang.nama_barang.ilike(data.nama_barang),
-            Barang.lokasi.ilike(data.lokasi),
-            Barang.tanggal_kejadian == data.tanggal_kejadian
+            func.lower(func.trim(Barang.nama_barang)) == data.nama_barang.strip().lower()
         )
         .first()
     )
@@ -41,7 +39,7 @@ def buat_laporan_kehilangan(
         db.close()
         raise HTTPException(
             status_code=400,
-            detail="Laporan kehilangan serupa sudah pernah dibuat"
+            detail="Nama barang sudah pernah dilaporkan sebagai kehilangan"
         )
 
     barang_baru = Barang(
@@ -86,20 +84,12 @@ def buat_laporan_penemuan(data: LaporanCreate,
     current_user: User = Depends(get_current_user)):
     db = SessionLocal()
 
-    user = db.query(User).filter(User.user_id == data.user_id).first()
-    if not user:
-        db.close()
-        raise HTTPException(status_code=404, detail="User tidak ditemukan")
-
     duplikat = (
         db.query(Laporan)
         .join(Barang, Laporan.barang_id == Barang.barang_id)
         .filter(
-            Laporan.user_id == current_user.user_id,
             Laporan.jenis_laporan == "penemuan",
-            Barang.nama_barang.ilike(data.nama_barang),
-            Barang.lokasi.ilike(data.lokasi),
-            Barang.tanggal_kejadian == data.tanggal_kejadian
+            func.lower(func.trim(Barang.nama_barang)) == data.nama_barang.strip().lower()
         )
         .first()
     )
@@ -108,7 +98,7 @@ def buat_laporan_penemuan(data: LaporanCreate,
         db.close()
         raise HTTPException(
             status_code=400,
-            detail="Laporan penemuan serupa sudah pernah dibuat"
+            detail="Nama barang sudah pernah dilaporkan sebagai penemuan"
         )
 
     barang_baru = Barang(

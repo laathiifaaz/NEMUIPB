@@ -38,6 +38,7 @@ class BarangService extends ApiService {
       method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify({
+        barang_id: barangId,
         laporan_kehilangan_id: laporanKehilanganId,
       }),
     });

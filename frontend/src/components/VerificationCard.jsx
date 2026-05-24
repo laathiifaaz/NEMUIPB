@@ -76,7 +76,7 @@ class VerificationCard extends Component {
             font-semibold
           "
         >
-          View Details
+          Lihat Detail
         </button>
       </div>
     );

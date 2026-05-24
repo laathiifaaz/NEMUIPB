@@ -77,6 +77,13 @@ class AuthService {
         "role",
         data.user.role
       );
+
+      if (data.user.role === "admin") {
+        localStorage.setItem(
+          "admin_login_time",
+          new Date().toISOString()
+        );
+      }
     }
 
     return data;
@@ -106,6 +113,10 @@ class AuthService {
 
     localStorage.removeItem(
       "role"
+    );
+
+    localStorage.removeItem(
+      "admin_login_time"
     );
   }
 
@@ -146,6 +157,9 @@ class AuthService {
 
       token:
         localStorage.getItem("access_token"),
+
+      admin_login_time:
+        localStorage.getItem("admin_login_time"),
     };
   }
 
