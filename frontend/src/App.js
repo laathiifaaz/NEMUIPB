@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
@@ -8,9 +9,10 @@ import VerificationReportPage from "./pages/VerificationReportPage.jsx";
 import AdminBarangPage from "./pages/AdminBarangPage.jsx";
 import AdminVerificationPage from "./pages/AdminVerificationPage";
 import KoleksiBarangPage from "./pages/KoleksiBarangPage.js";
-import AuthService from "./services/AuthService";
 import UserManagementPage from "./pages/UserManagementPage";
+import AdminAnalyticsPage from "./pages/AdminAnalyticPage.jsx";
 
+import AuthService from "./services/AuthService";
 
 class App extends Component {
   constructor(props) {
@@ -100,9 +102,10 @@ class App extends Component {
       );
     }
 
+    // Lapor penemuan
     if (currentPath === "/lapor-penemuan") {
-    return <FindReportPage navigate={this.navigate} />;
-  }
+      return <FindReportPage navigate={this.navigate} />;
+    }
 
     // Admin barang
     if (currentPath === "/admin/barang") {
@@ -113,7 +116,7 @@ class App extends Component {
       return <AdminBarangPage navigate={this.navigate} />;
     }
 
-    // User Management
+    // User management
     if (currentPath === "/admin/users") {
       if (user.role !== "admin") {
         return <DashboardPage navigate={this.navigate} />;
@@ -122,22 +125,23 @@ class App extends Component {
       return <UserManagementPage navigate={this.navigate} />;
     }
 
+    // Admin verification
     if (currentPath === "/admin/verifikasi") {
+      if (user.role !== "admin") {
+        return <DashboardPage navigate={this.navigate} />;
+      }
 
-    if (user.role !== "admin") {
-      return (
-        <DashboardPage
-          navigate={this.navigate}
-        />
-      );
+      return <AdminVerificationPage navigate={this.navigate} />;
     }
 
-    return (
-      <AdminVerificationPage
-        navigate={this.navigate}
-      />
-    );
-  }
+    // Admin analytics
+    if (currentPath === "/admin/analytics") {
+      if (user.role !== "admin") {
+        return <DashboardPage navigate={this.navigate} />;
+      }
+
+      return <AdminAnalyticsPage navigate={this.navigate} />;
+    }
 
     // fallback
     return <DashboardPage navigate={this.navigate} />;

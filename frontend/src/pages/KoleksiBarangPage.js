@@ -49,6 +49,10 @@ class KoleksiBarangPage extends Component {
       error: null,
       selectedBarang: null,
       isModalOpen: false,
+      
+      // State tambahan untuk Pagination
+      currentPage: 1,
+      itemsPerPage: 6, // Mengatur jumlah kartu per halaman (misal: 6 barang)
     };
   }
 
@@ -131,6 +135,7 @@ class KoleksiBarangPage extends Component {
       this.setState({
         items: Array.isArray(data) ? data : [],
         loading: false,
+        currentPage: 1, // Reset ke halaman pertama setiap kali filter berubah
       });
     } catch (error) {
       this.setState({
@@ -157,6 +162,7 @@ class KoleksiBarangPage extends Component {
       this.setState({
         items: Array.isArray(data) ? data : [],
         loading: false,
+        currentPage: 1, // Reset ke halaman pertama setiap kali mencari barang
       });
     } catch (error) {
       this.setState({
@@ -183,6 +189,13 @@ class KoleksiBarangPage extends Component {
     );
   };
 
+  // Fungsi navigasi halaman
+  handlePageChange = (pageNumber) => {
+    this.setState({ currentPage: pageNumber });
+    // Scroll otomatis ke atas area hasil penelusuran saat ganti halaman
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   getItemImage(item) {
     if (item.foto_url) return item.foto_url;
     if (item.dokumentasi?.startsWith("data:image/")) return item.dokumentasi;
@@ -201,6 +214,61 @@ class KoleksiBarangPage extends Component {
     };
   }
 
+  renderPagination(totalPages) {
+    const { currentPage } = this.state;
+    if (totalPages <= 1) return null;
+
+    const pageNumbers = [];
+    for (let i = 1; i <= totalPages; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <div className="flex justify-center items-center gap-2 mt-10 mb-6">
+        {/* Tombol Sebelumnya */}
+        <button
+          onClick={() => this.handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
+            currentPage === 1
+              ? "text-gray-300 cursor-not-allowed"
+              : "text-[#002B5B] bg-white border border-gray-100 hover:bg-gray-50"
+          }`}
+        >
+          <i className="fas fa-chevron-left text-xs"></i>
+        </button>
+
+        {/* Nomor Halaman */}
+        {pageNumbers.map((number) => (
+          <button
+            key={number}
+            onClick={() => this.handlePageChange(number)}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
+              currentPage === number
+                ? "bg-[#002B5B] text-white shadow-md shadow-blue-900/10"
+                : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
+            }`}
+          >
+            {number}
+          </button>
+        ))}
+
+        {/* Tombol Selanjutnya */}
+        <button
+          onClick={() => this.handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
+            currentPage === totalPages
+              ? "text-gray-300 cursor-not-allowed"
+              : "text-[#002B5B] bg-white border border-gray-100 hover:bg-gray-50"
+          }`}
+        >
+          <i className="fas fa-chevron-right text-xs"></i>
+        </button>
+      </div>
+    );
+  }
+
   render() {
     const {
       user,
@@ -213,7 +281,15 @@ class KoleksiBarangPage extends Component {
       items,
       loading,
       error,
+      currentPage,
+      itemsPerPage,
     } = this.state;
+
+    // Kalkulasi Data Halaman Aktif
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = items.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(items.length / itemsPerPage);
 
     return (
       <div className="flex min-h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans']">
@@ -286,7 +362,7 @@ class KoleksiBarangPage extends Component {
                   </h3>
 
                   <div className="space-y-2">
-                    {["Semua", "Elektronik", "Alat Tulis", "Barang Pribadi"].map((category) => {
+                    {["Semua", "Elektronik", "Alat Tulis", "Barang Pribadi", "Lainnya"].map((category) => {
                       const value = category.toLowerCase();
 
                       return (
@@ -389,7 +465,7 @@ class KoleksiBarangPage extends Component {
                     Hasil Penelusuran
                   </h3>
                   <p className="text-xs text-gray-400 font-medium">
-                    Ditemukan {items.length} barang di sistem
+                    Menampilkan {items.length} barang di sistem
                   </p>
                 </div>
               </div>
@@ -409,71 +485,77 @@ class KoleksiBarangPage extends Component {
                   Tidak ada barang yang cocok dengan filter saat ini.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {items.map((item) => {
-                    const normalizedItem = this.normalizeBarang(item);
-                    const itemId = normalizedItem.id;
+                <>
+                  {/* Gunakan data 'currentItems' hasil potongan per halaman */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {currentItems.map((item) => {
+                      const normalizedItem = this.normalizeBarang(item);
+                      const itemId = normalizedItem.id;
 
-                    return (
-                      <div
-                        key={itemId}
-                        className="bg-white rounded-[28px] p-3 border border-gray-50 shadow-sm hover:shadow-xl transition-all group"
-                      >
-                        <div className="relative aspect-square rounded-[22px] overflow-hidden bg-gray-100">
-                          <img
-                            src={normalizedItem.foto_url}
-                            alt={normalizedItem.nama_barang}
-                            onError={(event) => {
-                              event.currentTarget.src = "/images/logo-ipb.png";
-                            }}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
+                      return (
+                        <div
+                          key={itemId}
+                          className="bg-white rounded-[28px] p-3 border border-gray-50 shadow-sm hover:shadow-xl transition-all group"
+                        >
+                          <div className="relative aspect-square rounded-[22px] overflow-hidden bg-gray-100">
+                            <img
+                              src={normalizedItem.foto_url}
+                              alt={normalizedItem.nama_barang}
+                              onError={(event) => {
+                                event.currentTarget.src = "/images/logo-ipb.png";
+                              }}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
 
-                          <div
-                            className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[8px] font-black text-white uppercase ${
-                              normalizedItem.status_barang === "hilang"
-                                ? "bg-blue-500"
-                                : normalizedItem.status_barang === "ditemukan"
-                                  ? "bg-cyan-600"
-                                  : "bg-yellow-500"
-                            }`}
-                          >
-                            {normalizedItem.status_barang || "tidak diketahui"}
-                          </div>
-                        </div>
-
-                        <div className="p-4">
-                          <p className="text-[9px] font-black text-yellow-600 uppercase mb-1">
-                            {normalizedItem.kategori || "Kategori"}
-                          </p>
-
-                          <h4 className="font-bold text-[#002B5B] text-base mb-1 truncate">
-                            {normalizedItem.nama_barang}
-                          </h4>
-
-                          <div className="flex items-center gap-2 text-gray-400 text-[10px] mb-4">
-                            <i className="fas fa-map-marker-alt text-yellow-600"></i>
-                            <span className="truncate">{normalizedItem.lokasi}</span>
-                          </div>
-
-                          <div className="flex justify-between items-center border-t border-gray-50 pt-4">
-                            <span className="text-[9px] text-gray-300 font-bold tracking-tighter">
-                              ID: #{itemId}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => this.openModal(normalizedItem)}
-                              className="text-[10px] font-black text-[#002B5B] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+                            <div
+                              className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[8px] font-black text-white uppercase ${
+                                normalizedItem.status_barang === "hilang"
+                                  ? "bg-blue-500"
+                                  : normalizedItem.status_barang === "ditemukan"
+                                    ? "bg-cyan-600"
+                                    : "bg-yellow-500"
+                              }`}
                             >
-                              DETAIL
-                            </button>
+                              {normalizedItem.status_barang || "tidak diketahui"}
+                            </div>
+                          </div>
+
+                          <div className="p-4">
+                            <p className="text-[9px] font-black text-yellow-600 uppercase mb-1">
+                              {normalizedItem.kategori || "Kategori"}
+                            </p>
+
+                            <h4 className="font-bold text-[#002B5B] text-base mb-1 truncate">
+                              {normalizedItem.nama_barang}
+                            </h4>
+
+                            <div className="flex items-center gap-2 text-gray-400 text-[10px] mb-4">
+                              <i className="fas fa-map-marker-alt text-yellow-600"></i>
+                              <span className="truncate">{normalizedItem.lokasi}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center border-t border-gray-50 pt-4">
+                              <span className="text-[9px] text-gray-300 font-bold tracking-tighter">
+                                ID: #{itemId}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => this.openModal(normalizedItem)}
+                                className="text-[10px] font-black text-[#002B5B] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                DETAIL
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Render Tombol Navigasi Halaman */}
+                  {this.renderPagination(totalPages)}
+                </>
               )}
             </section>
           </div>

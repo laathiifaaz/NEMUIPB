@@ -34,24 +34,28 @@ class AdminSidebar extends Component {
       <div
         onClick={() => this.handleNavigate(path)}
         className={`
-      flex
-      items-center
-      ${expanded ? "justify-between" : "justify-center"}
-      h-14
-      ${expanded ? "px-4" : "px-0"}
-      rounded-2xl
+          flex
+          items-center
+          ${expanded ? "justify-between" : "justify-center"}
+          h-14
+          ${expanded ? "px-4" : "px-0"}
+          rounded-2xl
           cursor-pointer
           relative
           overflow-hidden
           transition-colors duration-200
           ${
-          isActive
-            ? "bg-[#163A70] text-white shadow-sm"
-            : "text-gray-500 hover:bg-[#EEF4FB] hover:text-[#002B5B]"
+            isActive
+              ? "bg-[#163A70] text-white shadow-sm"
+              : "text-gray-500 hover:bg-[#EEF4FB] hover:text-[#002B5B]"
           }
         `}
       >
-        <div className={`flex items-center ${expanded ? "" : "justify-center w-full"}`}>
+        <div
+          className={`flex items-center ${
+            expanded ? "" : "justify-center w-full"
+          }`}
+        >
           <div className="w-5 flex justify-center flex-shrink-0">
             <i className={`fas ${icon}`}></i>
           </div>
@@ -62,7 +66,11 @@ class AdminSidebar extends Component {
               text-sm
               whitespace-nowrap
               overflow-hidden
-              ${expanded ? "ml-4 max-w-40 opacity-100" : "ml-0 max-w-0 opacity-0"}
+              ${
+                expanded
+                  ? "ml-4 max-w-40 opacity-100"
+                  : "ml-0 max-w-0 opacity-0"
+              }
               transition-all duration-150
             `}
           >
@@ -121,6 +129,7 @@ class AdminSidebar extends Component {
             <h1 className="font-extrabold text-[#002B5B] text-xl leading-none">
               NEMU IPB
             </h1>
+
             <p className="text-xs text-[#56708F] font-extrabold tracking-tight mt-1">
               IPB LOST & FOUND
             </p>
@@ -128,15 +137,34 @@ class AdminSidebar extends Component {
         </div>
 
         <nav className="flex flex-col gap-2">
-          {this.renderItem("fa-th-large", "Beranda", "dashboard", "/admin")}
-          {this.renderItem("fa-box", "Koleksi Barang", "barang", "/admin/barang")}
+          {this.renderItem(
+            "fa-th-large",
+            "Beranda",
+            "dashboard",
+            "/admin"
+          )}
+
+          {this.renderItem(
+            "fa-box",
+            "Koleksi Barang",
+            "barang",
+            "/admin/barang"
+          )}
+
           {this.renderItem(
             "fa-check-circle",
             "Verifikasi",
             "verification",
             "/admin/verifikasi"
           )}
-          {this.renderItem("fa-chart-bar", "Analitik", "analitik", "/admin")}
+
+          {this.renderItem(
+            "fa-chart-bar",
+            "Analitik",
+            "analitik",
+            "/admin/analytics"
+          )}
+
           {this.renderItem(
             "fa-users",
             "Daftar Admin",
@@ -148,7 +176,9 @@ class AdminSidebar extends Component {
         <div className="mt-auto flex flex-col gap-2">
           <div
             onClick={() => this.setState({ showGuidePopup: true })}
-            className={`flex items-center h-12 rounded-2xl text-gray-500 hover:text-[#002B5B] hover:bg-[#EEF4FB] cursor-pointer transition-colors ${expanded ? "px-4" : "justify-center px-0"}`}
+            className={`flex items-center h-12 rounded-2xl text-gray-500 hover:text-[#002B5B] hover:bg-[#EEF4FB] cursor-pointer transition-colors ${
+              expanded ? "px-4" : "justify-center px-0"
+            }`}
           >
             <div className="w-5 flex justify-center flex-shrink-0">
               <i className="far fa-question-circle text-xl"></i>
@@ -158,7 +188,11 @@ class AdminSidebar extends Component {
               className={`
                 font-bold text-sm whitespace-nowrap overflow-hidden
                 transition-all duration-200
-                ${expanded ? "ml-3 max-w-32 opacity-100" : "ml-0 max-w-0 opacity-0"}
+                ${
+                  expanded
+                    ? "ml-3 max-w-32 opacity-100"
+                    : "ml-0 max-w-0 opacity-0"
+                }
               `}
             >
               Panduan
@@ -167,7 +201,9 @@ class AdminSidebar extends Component {
 
           <button
             onClick={this.handleLogout}
-            className={`flex items-center h-12 w-full bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors ${expanded ? "px-4" : "justify-center px-0"}`}
+            className={`flex items-center h-12 w-full bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors ${
+              expanded ? "px-4" : "justify-center px-0"
+            }`}
           >
             <div className="w-5 flex justify-center flex-shrink-0">
               <i className="fas fa-sign-out-alt text-[14px]"></i>
@@ -177,7 +213,11 @@ class AdminSidebar extends Component {
               className={`
                 font-bold text-sm whitespace-nowrap overflow-hidden
                 transition-all duration-200
-                ${expanded ? "ml-3 max-w-32 opacity-100" : "ml-0 max-w-0 opacity-0"}
+                ${
+                  expanded
+                    ? "ml-3 max-w-32 opacity-100"
+                    : "ml-0 max-w-0 opacity-0"
+                }
               `}
             >
               Keluar
