@@ -7,6 +7,7 @@ import VerificationReportPage from "./pages/VerificationReportPage.jsx";
 import AdminBarangPage from "./pages/AdminBarangPage.jsx";
 import KoleksiBarangPage from "./pages/KoleksiBarangPage.js";
 import AuthService from "./services/AuthService";
+import AdminAnalyticsPage from "./pages/AdminAnalyticPage.jsx";
 
 class App extends Component {
   constructor(props) {
@@ -103,6 +104,15 @@ class App extends Component {
       }
 
       return <AdminBarangPage navigate={this.navigate} />;
+    }
+
+    // Admin analytics
+    if (currentPath === "/admin/analytics") {
+      if (user.role !== "admin") {
+        return <DashboardPage navigate={this.navigate} />;
+      }
+
+      return <AdminAnalyticsPage navigate={this.navigate} />;
     }
 
     // fallback

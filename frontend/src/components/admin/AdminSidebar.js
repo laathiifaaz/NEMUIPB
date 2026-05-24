@@ -114,7 +114,7 @@ class AdminSidebar extends Component {
           {this.renderItem("fa-th-large", "Beranda", "dashboard", "/admin")}
           {this.renderItem("fa-box", "Koleksi Barang", "barang", "/admin/barang")}
           {this.renderItem("fa-check-circle", "Verifikasi", "verifikasi", "/admin")}
-          {this.renderItem("fa-chart-bar", "Analitik", "analitik", "/admin")}
+          {this.renderItem("fa-chart-bar", "Analitik", "analitik", "/admin/analytics")}
           {this.renderItem("fa-users", "User Management", "users", "/admin")}
         </nav>
 
