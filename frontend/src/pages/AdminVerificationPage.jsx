@@ -21,14 +21,17 @@ class AdminVerificationPage extends Component {
       claimsLoading: true,
       search: "",
       currentPage: 1,
-      reportsPerPage: 10,
+      reportsPerPage: 6,
       activeVerificationView: "laporan",
 
       selectedFilter: "semua",
+      selectedReportType: "semua",
       showFilterMenu: false,
+      showExportMenu: false,
 
       selectedReport: null,
       showDetailModal: false,
+      showImagePreview: false,
 
       showRejectModal: false,
       selectedReportId: null,
@@ -91,30 +94,50 @@ class AdminVerificationPage extends Component {
     });
     };
 
-    handleFilterChange = (filter) => {
-    const { reports, search } = this.state;
+  getFilteredReports(reports, search, statusFilter, reportTypeFilter) {
+    const query = (search || "").toLowerCase();
 
     let filtered = [...reports];
 
-    if (filter !== "semua") {
-        filtered = filtered.filter(
-        (item) => item.status_verifikasi === filter
-        );
+    if (statusFilter !== "semua") {
+      filtered = filtered.filter(
+        (item) => item.status_verifikasi === statusFilter
+      );
     }
 
-    if (search) {
-        filtered = filtered.filter((item) =>
+    if (reportTypeFilter !== "semua") {
+      filtered = filtered.filter(
+        (item) => item.jenis_laporan === reportTypeFilter
+      );
+    }
+
+    if (query) {
+      filtered = filtered.filter((item) =>
         item.nama_barang
             ?.toLowerCase()
-            .includes(search.toLowerCase()) ||
+            .includes(query) ||
         item.pelapor
             ?.toLowerCase()
-            .includes(search.toLowerCase()) ||
+            .includes(query) ||
         item.kategori
             ?.toLowerCase()
-            .includes(search.toLowerCase())
-        );
+            .includes(query) ||
+        item.lokasi
+            ?.toLowerCase()
+            .includes(query)
+      );
     }
+
+    return filtered;
+  }
+
+    handleFilterChange = (filter) => {
+    const filtered = this.getFilteredReports(
+      this.state.reports,
+      this.state.search,
+      filter,
+      this.state.selectedReportType
+    );
 
     this.setState({
         selectedFilter: filter,
@@ -123,6 +146,21 @@ class AdminVerificationPage extends Component {
         currentPage: 1,
     });
     };
+
+  handleReportTypeChange = (reportType) => {
+    const filtered = this.getFilteredReports(
+      this.state.reports,
+      this.state.search,
+      this.state.selectedFilter,
+      reportType
+    );
+
+    this.setState({
+      selectedReportType: reportType,
+      filteredReports: filtered,
+      currentPage: 1,
+    });
+  };
 
   fetchReports = async () => {
     try {
@@ -157,26 +195,11 @@ class AdminVerificationPage extends Component {
     handleSearch = (e) => {
     const value = e.target.value;
 
-    const { reports, selectedFilter } = this.state;
-
-    let filtered = [...reports];
-
-    if (selectedFilter !== "semua") {
-        filtered = filtered.filter(
-        (item) => item.status_verifikasi === selectedFilter
-        );
-    }
-
-    filtered = filtered.filter((item) =>
-        item.nama_barang
-        ?.toLowerCase()
-        .includes(value.toLowerCase()) ||
-        item.pelapor
-        ?.toLowerCase()
-        .includes(value.toLowerCase()) ||
-        item.kategori
-        ?.toLowerCase()
-        .includes(value.toLowerCase())
+    const filtered = this.getFilteredReports(
+      this.state.reports,
+      value,
+      this.state.selectedFilter,
+      this.state.selectedReportType
     );
 
     this.setState({
@@ -206,6 +229,148 @@ class AdminVerificationPage extends Component {
     }, 3000);
   };
 
+  toggleExportMenu = () => {
+    this.setState((prevState) => ({
+      showExportMenu: !prevState.showExportMenu,
+    }));
+  };
+
+  handleExportSelection = (exportType) => {
+    this.setState({ showExportMenu: false }, () => {
+      if (exportType.startsWith("laporan:")) {
+        const [, reportType, status] = exportType.split(":");
+        this.handleDownloadReportsCsv({ reportType, status });
+      }
+
+      if (exportType === "klaim") {
+        this.handleDownloadClaimsCsv();
+      }
+    });
+  };
+
+  formatCsvValue = (value) => {
+    if (value === null || value === undefined) return "";
+
+    if (value instanceof Date) {
+      return value.toISOString().slice(0, 10);
+    }
+
+    return String(value).replace(/\s+/g, " ").trim();
+  };
+
+  downloadCsv = (filename, columns, rows) => {
+    if (!rows || rows.length === 0) {
+      this.showPopup("error", "Tidak ada data untuk diunduh");
+      return;
+    }
+
+    const delimiter = ";";
+    const header = columns.map((column) => column.label).join(delimiter);
+    const body = rows.map((row) =>
+      columns
+        .map((column) => {
+          const rawValue =
+            typeof column.value === "function"
+              ? column.value(row)
+              : row[column.value];
+          const value = this.formatCsvValue(rawValue);
+
+          return `"${value.replace(/"/g, '""')}"`;
+        })
+        .join(delimiter)
+    );
+    const csv = ["\uFEFF" + header, ...body].join("\n");
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = filename;
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  getReportExportLabel(reportType, status) {
+    const reportLabels = {
+      penemuan: "penemuan",
+      kehilangan: "kehilangan",
+    };
+
+    return reportLabels[reportType] || "semua";
+  }
+
+  handleDownloadReportsCsv = ({ reportType = "semua", status = "semua" } = {}) => {
+    const sourceReports = Array.isArray(this.state.reports)
+      ? this.state.reports
+      : [];
+    const filteredReports = sourceReports.filter((report) => {
+      const matchesType =
+        reportType === "semua" || report.jenis_laporan === reportType;
+      const matchesStatus =
+        status === "semua" || report.status_verifikasi === status;
+
+      return matchesType && matchesStatus;
+    });
+    const orderedReports = [
+      ...filteredReports.filter(
+        (report) => report.status_verifikasi === "belum_diverifikasi"
+      ),
+      ...filteredReports.filter(
+        (report) => report.status_verifikasi !== "belum_diverifikasi"
+      ),
+    ];
+    const fileLabel = this.getReportExportLabel(reportType, status);
+
+    this.downloadCsv(
+      `verifikasi-laporan-${fileLabel}-nemuipb.csv`,
+      [
+        { label: "ID Laporan", value: "laporan_id" },
+        { label: "Nama Barang", value: "nama_barang" },
+        { label: "Pelapor", value: "pelapor" },
+        { label: "Email", value: "email" },
+        { label: "Jenis Laporan", value: "jenis_laporan" },
+        { label: "Status Verifikasi", value: "status_verifikasi" },
+        { label: "Status Laporan", value: "status_laporan" },
+        { label: "Kategori", value: "kategori" },
+        { label: "Lokasi", value: "lokasi" },
+        { label: "Tanggal Kejadian", value: "tanggal_kejadian" },
+        { label: "Status Barang", value: "status_barang" },
+        { label: "Catatan Admin", value: "catatan_verifikasi" },
+        {
+          label: "Tanggal Diverifikasi/Ditolak",
+          value: (report) =>
+            ["terverifikasi", "ditolak"].includes(report.status_verifikasi)
+              ? report.tanggal_verifikasi
+              : "",
+        },
+      ],
+      orderedReports
+    );
+  };
+
+  handleDownloadClaimsCsv = () => {
+    this.downloadCsv(
+      "verifikasi-klaim-barang-nemuipb.csv",
+      [
+        { label: "ID Klaim", value: "klaim_id" },
+        { label: "Nama Barang", value: "nama_barang" },
+        { label: "Pengklaim", value: "pengklaim" },
+        { label: "Email", value: "email" },
+        { label: "ID Barang", value: "barang_id" },
+        { label: "ID Laporan Kehilangan", value: "laporan_kehilangan_id" },
+        { label: "Kategori", value: "kategori" },
+        { label: "Lokasi Barang", value: "lokasi" },
+        { label: "Status Klaim", value: "status_klaim" },
+        { label: "Tanggal Pengajuan", value: "created_time" },
+        { label: "Catatan Admin", value: "catatan_admin" },
+      ],
+      this.state.pendingClaims
+    );
+  };
+
   fetchPendingClaims = async () => {
     this.setState({ claimsLoading: true });
 
@@ -229,7 +394,7 @@ class AdminVerificationPage extends Component {
   handleClaimVerification = async (claim, statusKlaim) => {
     const isAccepted = statusKlaim === "diterima";
     const catatanAdmin = isAccepted
-      ? "Klaim diterima admin. Status barang otomatis menjadi selesai/dikembalikan sesuai BE."
+      ? "Klaim diterima admin. Dokumen serah terima dan tanda tangan digital dibuat otomatis oleh sistem."
       : "Klaim ditolak admin.";
 
     try {
@@ -264,7 +429,7 @@ class AdminVerificationPage extends Component {
       this.showPopup(
         isAccepted ? "success" : "error",
         isAccepted
-          ? "Klaim diterima. BE mengubah status barang menjadi selesai."
+          ? "Klaim diterima. Dokumen serah terima dan tanda tangan digital berhasil diverifikasi."
           : "Klaim berhasil ditolak"
       );
     } catch (error) {
@@ -325,6 +490,7 @@ class AdminVerificationPage extends Component {
     this.setState({
       selectedReport: report,
       showDetailModal: true,
+      showImagePreview: false,
     });
   };
 
@@ -332,6 +498,19 @@ class AdminVerificationPage extends Component {
     this.setState({
       selectedReport: null,
       showDetailModal: false,
+      showImagePreview: false,
+    });
+  };
+
+  openImagePreview = () => {
+    this.setState({
+      showImagePreview: true,
+    });
+  };
+
+  closeImagePreview = () => {
+    this.setState({
+      showImagePreview: false,
     });
   };
 
@@ -619,7 +798,7 @@ class AdminVerificationPage extends Component {
                 Serah Terima & Tanda Tangan Digital
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                Dokumen dibuat otomatis oleh BE setelah klaim diterima.
+                Dokumen dibuat otomatis oleh sistem setelah klaim diterima.
               </p>
             </div>
 
@@ -693,7 +872,7 @@ class AdminVerificationPage extends Component {
 
                   <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                      Document Hash
+                      Hash Dokumen
                     </p>
                     <p className="break-all text-xs font-bold text-[#2563EB] leading-relaxed">
                       {handoverDocument?.dokumen_hash || "-"}
@@ -738,34 +917,53 @@ class AdminVerificationPage extends Component {
     const isDisabled =
       selectedReport.status_verifikasi !==
       "belum_diverifikasi";
+    const reportType = this.getReportTypeMeta(selectedReport.jenis_laporan);
+    const reportDateLabel =
+      selectedReport.jenis_laporan === "penemuan"
+        ? "Tanggal Penemuan"
+        : "Tanggal Kehilangan";
+    const submittedDate = selectedReport.created_time
+      ? new Date(selectedReport.created_time).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : "-";
+    const imageSrc = this.getImageSrc(selectedReport.dokumentasi);
 
     return (
       <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-6">
-        <div className="bg-white rounded-[24px] w-full max-w-5xl p-5 md:p-6 relative max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-[32px] w-full max-w-[1060px] relative max-h-[92vh] overflow-hidden shadow-2xl">
           <button
             type="button"
             onClick={this.closeDetailModal}
-            className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+            className="absolute top-3 right-6 z-20 text-gray-400 hover:text-gray-600 text-xl transition-colors"
+            aria-label="Tutup detail laporan"
           >
-            <i className="fas fa-times"></i>
+            x
           </button>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-            <div>
-              <div className="relative rounded-[25px] overflow-hidden bg-gray-100">
+          <div className="flex flex-col md:flex-row max-h-[92vh] overflow-y-auto">
+            <div className="w-full md:w-[38%] bg-gray-50 flex items-center justify-center overflow-hidden min-h-[260px] md:min-h-[620px]">
+              <button
+                type="button"
+                onClick={this.openImagePreview}
+                className="relative w-full h-full cursor-zoom-in"
+                aria-label="Perbesar foto barang"
+              >
                 <span className="absolute top-4 left-4 bg-[#006D8F] text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase">
                   {selectedReport.status_barang || "status"}
                 </span>
 
                 <img
-                  src={this.getImageSrc(selectedReport.dokumentasi)}
+                  src={imageSrc}
                   alt={selectedReport.nama_barang}
-                  className="w-full h-72 object-cover"
+                  className="w-full h-full object-cover"
                 />
-              </div>
+              </button>
             </div>
 
-            <div className="md:col-span-2 md:pr-12">
+            <div className="flex-1 p-8 md:p-12 flex flex-col gap-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start mb-4">
                 <div>
                   <p className="text-[#9A7D0A] text-xs font-black uppercase tracking-widest">
@@ -779,7 +977,7 @@ class AdminVerificationPage extends Component {
 
                 <div className="md:text-right">
                   <p className="text-gray-400 text-xs font-black uppercase">
-                    Dilaporkan
+                    {reportDateLabel}
                   </p>
 
                   <p className="text-[#002B5B] font-semibold">
@@ -814,6 +1012,38 @@ class AdminVerificationPage extends Component {
                 </div>
               </div>
 
+              <div className="mb-8 bg-[#F8FAFC] border border-[#E7ECF3] rounded-2xl p-4">
+                <div className="flex flex-wrap gap-3">
+                  <div className="bg-white border border-[#E7ECF3] px-4 py-3 rounded-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                      Jenis Laporan
+                    </p>
+                    <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-black ${reportType.badgeClass}`}>
+                      <i className={`fas ${reportType.icon}`}></i>
+                      {reportType.label}
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-[#E7ECF3] px-4 py-3 rounded-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                      {reportDateLabel}
+                    </p>
+                    <p className="text-sm font-bold text-[#002B5B]">
+                      {selectedReport.tanggal_kejadian || "-"}
+                    </p>
+                  </div>
+
+                  <div className="bg-white border border-[#E7ECF3] px-4 py-3 rounded-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                      Tanggal Dilaporkan
+                    </p>
+                    <p className="text-sm font-bold text-[#002B5B]">
+                      {submittedDate}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {selectedReport.catatan_verifikasi && (
                 <div className="mb-8 bg-[#FFF7F7] border border-red-100 rounded-2xl p-4">
                   <p className="text-xs font-bold text-red-500 mb-1">
@@ -826,7 +1056,7 @@ class AdminVerificationPage extends Component {
                 </div>
               )}
 
-              <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
+              <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center border-t border-gray-50 pt-6 mt-auto">
                 <p className="text-xs text-gray-400 font-bold">
                   ID: #IPB-{selectedReport.laporan_id}
                 </p>
@@ -868,6 +1098,28 @@ class AdminVerificationPage extends Component {
             </div>
           </div>
         </div>
+        {this.state.showImagePreview && (
+          <div
+            className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4"
+            onClick={this.closeImagePreview}
+          >
+            <button
+              type="button"
+              onClick={this.closeImagePreview}
+              className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white text-[#002B5B] hover:bg-gray-100 transition-colors"
+              aria-label="Tutup foto"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+
+            <img
+              src={imageSrc}
+              alt={selectedReport.nama_barang}
+              className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -889,7 +1141,11 @@ class AdminVerificationPage extends Component {
     );
     const safeCurrentPage = Math.min(currentPage, totalPages);
     const startIndex = (safeCurrentPage - 1) * reportsPerPage;
-    const paginatedReports = filteredReports.slice(
+    const orderedReports = [
+      ...filteredReports.filter((r) => r.status_verifikasi === "belum_diverifikasi"),
+      ...filteredReports.filter((r) => r.status_verifikasi !== "belum_diverifikasi"),
+    ];
+    const paginatedReports = orderedReports.slice(
       startIndex,
       startIndex + reportsPerPage
     );
@@ -990,6 +1246,52 @@ class AdminVerificationPage extends Component {
               </button>
             </div>
 
+            <div className="mb-6 flex justify-end">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={this.toggleExportMenu}
+                  className="bg-white border border-[#E7ECF3] text-[#163A70] rounded-xl px-4 py-2.5 text-xs font-black hover:bg-[#F8FAFD] transition-all shadow-sm"
+                >
+                  <i className="fas fa-download mr-2"></i>
+                  Ekspor CSV
+                </button>
+
+                {this.state.showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-[#E7ECF3] shadow-xl p-2 z-40">
+                    <p className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                      Laporan Penemuan
+                    </p>
+                    {[
+                      { value: "laporan:semua:semua", label: "Semua Laporan" },
+                      { value: "laporan:penemuan:semua", label: "Penemuan" },
+                      { value: "laporan:kehilangan:semua", label: "Kehilangan" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => this.handleExportSelection(option.value)}
+                        className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-[#F8FAFD] hover:text-[#163A70] transition-all"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+
+                    <p className="px-4 pt-4 pb-2 text-[10px] font-black uppercase tracking-widest text-gray-400 border-t border-gray-100 mt-2">
+                      Klaim Barang
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => this.handleExportSelection("klaim")}
+                      className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-[#F8FAFD] hover:text-[#163A70] transition-all"
+                    >
+                      Klaim Menunggu
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {this.state.activeVerificationView === "laporan" && (
               <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -998,7 +1300,7 @@ class AdminVerificationPage extends Component {
                   Menunggu
                 </p>
 
-                <h2 className="text-3xl font-black text-[#2563EB]">
+                <h2 className="text-3xl font-black text-[#163A70]">
                   {pendingCount}
                 </h2>
               </div>
@@ -1008,7 +1310,7 @@ class AdminVerificationPage extends Component {
                   Terverifikasi
                 </p>
 
-                <h2 className="text-3xl font-black text-[#2563EB]">
+                <h2 className="text-3xl font-black text-[#163A70]">
                   {verifiedCount}
                 </h2>
               </div>
@@ -1018,7 +1320,7 @@ class AdminVerificationPage extends Component {
                   Ditolak
                 </p>
 
-                <h2 className="text-3xl font-black text-[#2563EB]">
+                <h2 className="text-3xl font-black text-[#163A70]">
                   {rejectedCount}
                 </h2>
               </div>
@@ -1034,12 +1336,14 @@ class AdminVerificationPage extends Component {
                     Verifikasi Klaim Barang
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Klaim yang diterima mengikuti BE saat ini: status barang otomatis menjadi <span className="font-bold">selesai</span>, ditampilkan sebagai Dikembalikan.
+                    Saat klaim diterima, sistem membuat dokumen serah terima beserta tanda tangan digital, lalu status barang otomatis menjadi <span className="font-bold">selesai</span>.
                   </p>
                 </div>
 
-                <div className="bg-blue-50 text-[#2563EB] px-4 py-2 rounded-xl text-xs font-black">
-                  {pendingClaims.length} klaim menunggu
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="bg-blue-50 text-[#2563EB] px-4 py-2 rounded-xl text-xs font-black">
+                    {pendingClaims.length} klaim menunggu
+                  </div>
                 </div>
               </div>
 
@@ -1111,7 +1415,7 @@ class AdminVerificationPage extends Component {
                         >
                           {this.state.handoverLoading
                             ? "Memproses..."
-                            : "Terima & Buat Serah Terima"}
+                            : "Terima & Verifikasi Tanda Tangan"}
                         </button>
 
                         <button
@@ -1134,7 +1438,7 @@ class AdminVerificationPage extends Component {
 
             {this.state.activeVerificationView === "laporan" && (
               <>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-8">
             
             <div className="relative">
                 <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
@@ -1316,6 +1620,26 @@ class AdminVerificationPage extends Component {
                 </div>
                 )}
             </div>
+            <div className="inline-flex h-11 bg-white border border-[#E7ECF3] rounded-2xl p-1">
+                {[
+                    { value: "semua", label: "Semua Jenis" },
+                    { value: "penemuan", label: "Penemuan" },
+                    { value: "kehilangan", label: "Kehilangan" },
+                ].map((option) => (
+                    <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => this.handleReportTypeChange(option.value)}
+                        className={`px-4 rounded-xl text-xs font-black transition-all ${
+                            this.state.selectedReportType === option.value
+                                ? "bg-[#163A70] text-white"
+                                : "text-[#163A70] hover:bg-[#F5F7FB]"
+                        }`}
+                    >
+                        {option.label}
+                    </button>
+                ))}
+            </div>
             </div>
 
             {loading ? (
@@ -1350,14 +1674,15 @@ class AdminVerificationPage extends Component {
                       p-4
                       hover:shadow-sm
                       transition-all
+                      min-h-[300px]
                     `}
                   >
-                    <div className="flex flex-col lg:flex-row gap-5">
-                      <div className="relative w-full lg:w-[280px] shrink-0">
+                    <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-5 h-full">
+                      <div className="relative w-full h-56 lg:h-[268px] shrink-0 overflow-hidden rounded-[18px] bg-gray-100">
                         <img
                           src={this.getImageSrc(report.dokumentasi)}
                           alt={report.nama_barang}
-                          className="w-full h-56 lg:h-full min-h-[220px] object-cover rounded-[18px]"
+                          className="w-full h-full object-cover"
                         />
 
                         <span
@@ -1374,14 +1699,14 @@ class AdminVerificationPage extends Component {
                         </span>
                       </div>
 
-                      <div className="flex-1 min-w-0 flex flex-col gap-4">
+                      <div className="flex-1 min-w-0 flex flex-col gap-4 min-h-[268px]">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0">
-                            <h3 className="text-xl font-extrabold text-[#163A70] leading-tight">
+                            <h3 className="text-xl font-extrabold text-[#163A70] leading-tight truncate">
                               {report.nama_barang}
                             </h3>
 
-                            <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-3xl">
+                            <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-3xl line-clamp-2 min-h-[44px]">
                               {report.deskripsi || "Tidak ada deskripsi"}
                             </p>
                           </div>
@@ -1391,18 +1716,18 @@ class AdminVerificationPage extends Component {
                               Pelapor
                             </p>
 
-                            <h4 className="text-sm font-bold text-[#102348]">
+                            <h4 className="text-sm font-bold text-[#102348] truncate max-w-[180px] lg:ml-auto">
                               {report.pelapor}
                             </h4>
 
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 mt-1 truncate max-w-[220px] lg:ml-auto">
                               {report.email}
                             </p>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                          <div className="min-h-[52px]">
                             <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
                               Jenis Laporan
                             </p>
@@ -1415,27 +1740,39 @@ class AdminVerificationPage extends Component {
                             </span>
                           </div>
 
-                          <div>
+                          <div className="min-h-[52px]">
                             <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
                               Kategori
                             </p>
 
-                            <p className="text-sm font-semibold text-gray-600">
+                            <p className="text-sm font-semibold text-gray-600 truncate">
                               {report.kategori}
                             </p>
                           </div>
 
-                          <div>
+                          <div className="min-h-[52px]">
                             <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
                               Lokasi
                             </p>
 
-                            <p className="text-sm font-semibold text-gray-600">
+                            <p className="text-sm font-semibold text-gray-600 truncate">
                               {report.lokasi}
                             </p>
                           </div>
 
-                          <div>
+                          <div className="min-h-[52px]">
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
+                              {report.jenis_laporan === "penemuan"
+                                ? "Tanggal Penemuan"
+                                : "Tanggal Kehilangan"}
+                            </p>
+
+                            <p className="text-sm font-semibold text-gray-600">
+                              {report.tanggal_kejadian || "-"}
+                            </p>
+                          </div>
+
+                          <div className="min-h-[52px]">
                             <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black mb-1">
                               Status Verifikasi
                             </p>
@@ -1460,7 +1797,7 @@ class AdminVerificationPage extends Component {
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pt-2 border-t border-[#F1F4F8]">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pt-3 border-t border-[#F1F4F8] mt-auto">
                           <p className="text-xs text-gray-400 font-bold">
                             ID: #IPB-{report.laporan_id}
                           </p>
@@ -1575,9 +1912,10 @@ class AdminVerificationPage extends Component {
                       type="button"
                       onClick={() => this.setPage(Math.max(1, safeCurrentPage - 1))}
                       disabled={safeCurrentPage === 1}
-                      className="px-4 py-2 rounded-xl border border-[#D6E2F0] text-xs font-bold text-[#163A70] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB]"
+                      className="w-9 h-9 rounded-xl border border-[#D6E2F0] text-xs font-bold text-[#163A70] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] flex items-center justify-center"
+                      aria-label="Halaman sebelumnya"
                     >
-                      Sebelumnya
+                      <i className="fas fa-chevron-left"></i>
                     </button>
 
                     <div className="px-4 py-2 rounded-xl bg-[#F5F7FB] text-xs font-bold text-[#102348]">
@@ -1619,9 +1957,10 @@ class AdminVerificationPage extends Component {
                       type="button"
                       onClick={() => this.setPage(Math.min(totalPages, safeCurrentPage + 1))}
                       disabled={safeCurrentPage === totalPages}
-                      className="px-4 py-2 rounded-xl border border-[#D6E2F0] text-xs font-bold text-[#163A70] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB]"
+                      className="w-9 h-9 rounded-xl border border-[#D6E2F0] text-xs font-bold text-[#163A70] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] flex items-center justify-center"
+                      aria-label="Halaman berikutnya"
                     >
-                      Berikutnya
+                      <i className="fas fa-chevron-right"></i>
                     </button>
                   </div>
                 </div>

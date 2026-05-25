@@ -14,6 +14,14 @@ class ApiService {
     const data = await response.json();
 
     if (!response.ok) {
+      if (response.status === 401) {
+        window.dispatchEvent(
+          new CustomEvent("session-expired", {
+            detail: data.detail || "Sesi Anda sudah berakhir",
+          })
+        );
+      }
+
       throw new Error(data.detail || "Terjadi kesalahan pada server");
     }
 

@@ -17,6 +17,8 @@ class AdminBarangPage extends Component {
       logs: [],
       actionType: "semua",
       sortBy: "newest",
+      exportType: "semua",
+      showExportMenu: false,
       isLoading: true,
       error: null,
       isSidebarExpanded: getStoredSidebarExpanded(),
@@ -84,6 +86,28 @@ class AdminBarangPage extends Component {
     });
   };
 
+  handleExportTypeChange = (event) => {
+    this.setState({
+      exportType: event.target.value,
+    });
+  };
+
+  toggleExportMenu = () => {
+    this.setState((prevState) => ({
+      showExportMenu: !prevState.showExportMenu,
+    }));
+  };
+
+  handleExportSelection = (exportType) => {
+    this.setState(
+      {
+        exportType,
+        showExportMenu: false,
+      },
+      this.handleExport
+    );
+  };
+
   convertToCSV = (data) => {
     if (!data || data.length === 0) return "";
 
@@ -112,7 +136,11 @@ class AdminBarangPage extends Component {
   handleExport = async () => {
     try {
       const data = await AdminBarangService.exportLogs();
-      const csv = this.convertToCSV(data);
+      const exportData =
+        this.state.exportType === "semua"
+          ? data
+          : data.filter((item) => item.action_type === this.state.exportType);
+      const csv = this.convertToCSV(exportData);
 
       if (!csv) {
         alert("Tidak ada data untuk diexport");
@@ -127,7 +155,10 @@ class AdminBarangPage extends Component {
       const link = document.createElement("a");
 
       link.href = url;
-      link.download = "activity-logs-nemuipb.csv";
+      link.download =
+        this.state.exportType === "semua"
+          ? "activity-logs-nemuipb.csv"
+          : `activity-logs-${this.state.exportType}-nemuipb.csv`;
       link.click();
 
       URL.revokeObjectURL(url);
@@ -177,25 +208,14 @@ class AdminBarangPage extends Component {
               onToggleSidebar={this.toggleSidebar}
               profileIcon="fa-user-shield"
               actions={
-                <>
-                  <button
-                    type="button"
-                    onClick={this.goToUserMode}
-                    className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
-                  >
-                    <i className="fas fa-user mr-2"></i>
-                    Mode Pengguna
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={this.handleExport}
-                    className="bg-gray-100 text-[#002B5B] px-5 py-3 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all"
-                  >
-                    <i className="fas fa-download mr-2"></i>
-                    Ekspor CSV
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={this.goToUserMode}
+                  className="bg-[#002B5B] hover:bg-[#001f42] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20 transition-all"
+                >
+                  <i className="fas fa-user mr-2"></i>
+                  Mode Pengguna
+                </button>
               }
             />
 
@@ -205,6 +225,40 @@ class AdminBarangPage extends Component {
                 Riwayat aktivitas barang, laporan, klaim, dan perubahan status
                 pada sistem NEMU IPB.
               </p>
+            </section>
+
+            <section className="mb-4 flex justify-end">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={this.toggleExportMenu}
+                  className="bg-white border border-gray-100 text-[#002B5B] rounded-xl px-4 py-2.5 text-xs font-black hover:bg-gray-50 transition-all shadow-sm"
+                >
+                  <i className="fas fa-download mr-2"></i>
+                  Ekspor CSV
+                </button>
+
+                {this.state.showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-gray-100 shadow-xl p-2 z-30">
+                    {[
+                      { value: "semua", label: "Semua Aktivitas" },
+                      { value: "verified", label: "Terverifikasi" },
+                      { value: "rejected", label: "Ditolak" },
+                      { value: "claim_pending", label: "Klaim Menunggu" },
+                      { value: "returned", label: "Dikembalikan" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => this.handleExportSelection(option.value)}
+                        className="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 hover:bg-[#F8FAFD] hover:text-[#002B5B] transition-all"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
 
             <section className="bg-white rounded-[24px] p-6 mb-8 shadow-sm">
@@ -252,6 +306,7 @@ class AdminBarangPage extends Component {
                     Terapkan Filter
                   </button>
                 </div>
+
               </div>
             </section>
 

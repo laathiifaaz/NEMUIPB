@@ -18,6 +18,55 @@ const formatNotificationDate = (value) => {
   });
 };
 
+const getUserNotificationTitle = (notification) => {
+  const message = (notification.pesan || "").toLowerCase();
+  const reportType = notification.jenis_laporan;
+  const itemName = notification.judul_laporan || `Laporan #${notification.laporan_id}`;
+
+  if (message.includes("klaim barang anda diterima")) {
+    return `Klaim barang disetujui: ${itemName}`;
+  }
+
+  if (message.includes("klaim barang anda ditolak")) {
+    return `Klaim barang ditolak: ${itemName}`;
+  }
+
+  if (reportType === "kehilangan") {
+    return `Laporan kehilangan: ${itemName}`;
+  }
+
+  if (reportType === "penemuan") {
+    return `Laporan penemuan: ${itemName}`;
+  }
+
+  return itemName || notification.pesan;
+};
+
+const getUserNotificationDescription = (notification) => {
+  const statusDate =
+    notification.tanggal_verifikasi ||
+    notification.tanggal_kirim ||
+    notification.tanggal_laporan;
+  const formattedDate = formatNotificationDate(statusDate);
+  const itemName = notification.judul_laporan || `Laporan #${notification.laporan_id}`;
+  const message = notification.pesan || "";
+  const normalizedMessage = message.toLowerCase();
+
+  const displayMessage = normalizedMessage.includes("klaim barang anda diterima")
+    ? "Klaim diterima. Ambil barang di Pos Keamanan Asrama IPB, Senin-Jumat 08.00-17.00 WIB."
+    : message;
+
+  if (!notification.laporan_id) return message;
+
+  return [
+    `Laporan #${notification.laporan_id} - ${itemName}.`,
+    formattedDate ? `Diperbarui pada ${formattedDate}.` : "",
+    displayMessage,
+  ]
+    .filter(Boolean)
+    .join(" ");
+};
+
 const NotificationBell = ({ navigate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -107,6 +156,7 @@ const NotificationBell = ({ navigate }) => {
               ...notification,
               judul_laporan: barang?.nama_barang || `Laporan #${notification.laporan_id}`,
               tanggal_laporan: barang?.tanggal_kejadian || detail?.tanggal_verifikasi,
+              tanggal_verifikasi: detail?.tanggal_verifikasi,
               jenis_laporan: detail?.jenis_laporan,
             };
           })
@@ -183,7 +233,7 @@ const NotificationBell = ({ navigate }) => {
     }
 
     if (notification.laporan_id && navigate) {
-      navigate("/verifikasi");
+      navigate(`/verifikasi?laporan=${notification.laporan_id}`);
       setIsOpen(false);
     }
   };
@@ -252,10 +302,14 @@ const NotificationBell = ({ navigate }) => {
 
                     <span className="min-w-0">
                       <span className="block text-xs font-extrabold text-[#0B2B5B] leading-relaxed">
-                        {notification.title || notification.judul_laporan || notification.pesan}
+                        {notification.synthetic
+                          ? notification.title
+                          : getUserNotificationTitle(notification)}
                       </span>
                       <span className="block text-[11px] text-gray-500 mt-1 leading-relaxed">
-                        {notification.synthetic ? notification.message : notification.pesan}
+                        {notification.synthetic
+                          ? notification.message
+                          : getUserNotificationDescription(notification)}
                       </span>
                       <span className="block text-[10px] text-gray-400 mt-1">
                         {notification.synthetic
@@ -325,7 +379,7 @@ const PageHeader = ({
         <NotificationBell navigate={navigate} />
 
         {showProfile && (
-          <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100">
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
             {displayName && (
               <span className="text-xs font-bold text-[#002B5B] hidden md:block">
                 {displayName}

@@ -2,9 +2,7 @@ import React, { Component } from "react";
 import AuthService from "../services/AuthService";
 import BarangService from "../services/BarangService";
 import ModalDetail from "../components/ModalDetail";
-import Sidebar from "../components/Sidebar";
-import PageHeader from "../components/PageHeader";
-import PageFooter from "../components/PageFooter";
+import UserPageLayout from "../components/UserPageLayout";
 import {
   getStoredSidebarExpanded,
   setStoredSidebarExpanded,
@@ -124,16 +122,114 @@ class KoleksiBarangPage extends Component {
     );
   }
 
+  getVerifiedItems(items) {
+    return (Array.isArray(items) ? items : []).filter(
+      (item) =>
+        item.status_verifikasi === "terverifikasi" &&
+        item.status_laporan === "disetujui"
+    );
+  }
+
+  getPendingClaimedBarangIds() {
+    try {
+      const storedClaims = JSON.parse(
+        localStorage.getItem("nemuipb_claim_status") || "{}"
+      );
+
+      return new Set(
+        Object.values(storedClaims)
+          .filter((claim) => claim.status_klaim === "diproses")
+          .map((claim) => String(claim.barang_id))
+      );
+    } catch (error) {
+      return new Set();
+    }
+  }
+
+  sortCollectionItems(items) {
+    return [...items].sort((a, b) => {
+      const aAvailable =
+        a.status_barang === "ditemukan" && a.jenis_laporan === "penemuan";
+      const bAvailable =
+        b.status_barang === "ditemukan" && b.jenis_laporan === "penemuan";
+
+      if (aAvailable !== bAvailable) {
+        return aAvailable ? -1 : 1;
+      }
+
+      return (
+        Number(b.laporan_id || b.barang_id || 0) -
+        Number(a.laporan_id || a.barang_id || 0)
+      );
+    });
+  }
+
+  getVisibleItems(items, keyword = this.state.searchKeyword) {
+    const {
+      filterStatus,
+      filterKategori,
+      filterLokasi,
+      startDate,
+      endDate,
+    } = this.state;
+
+    const normalizedKeyword = keyword.trim().toLowerCase();
+
+    const pendingClaimedBarangIds = this.getPendingClaimedBarangIds();
+
+    const visibleItems = this.getVerifiedItems(items).filter((item) => {
+      const isClaimPending =
+        item.status_barang === "diklaim" ||
+        item.status_barang === "claim_pending" ||
+        pendingClaimedBarangIds.has(String(item.barang_id));
+
+      if (isClaimPending) {
+        return false;
+      }
+
+      const matchesKeyword =
+        !normalizedKeyword ||
+        item.nama_barang?.toLowerCase().includes(normalizedKeyword) ||
+        item.deskripsi?.toLowerCase().includes(normalizedKeyword) ||
+        item.kategori?.toLowerCase().includes(normalizedKeyword) ||
+        item.lokasi?.toLowerCase().includes(normalizedKeyword);
+
+      const matchesStatus =
+        filterStatus === "semua" || item.status_barang === filterStatus;
+
+      const matchesKategori =
+        filterKategori === "semua" ||
+        item.kategori?.toLowerCase().includes(filterKategori);
+
+      const matchesLokasi =
+        filterLokasi === "semua" ||
+        item.lokasi?.toLowerCase().includes(filterLokasi.toLowerCase());
+
+      const itemDate = item.tanggal_kejadian || "";
+      const matchesStartDate = !startDate || itemDate >= startDate;
+      const matchesEndDate = !endDate || itemDate <= endDate;
+
+      return (
+        matchesKeyword &&
+        matchesStatus &&
+        matchesKategori &&
+        matchesLokasi &&
+        matchesStartDate &&
+        matchesEndDate
+      );
+    });
+
+    return this.sortCollectionItems(visibleItems);
+  }
+
   fetchBarang = async () => {
     this.setState({ loading: true, error: null });
 
     try {
-      const data = this.hasActiveFilter()
-        ? await BarangService.filterBarang(this.getFilterParams())
-        : await BarangService.getAllBarang();
+      const data = await BarangService.getAllBarang();
 
       this.setState({
-        items: Array.isArray(data) ? data : [],
+        items: this.getVisibleItems(data, ""),
         loading: false,
         currentPage: 1, // Reset ke halaman pertama setiap kali filter berubah
       });
@@ -157,10 +253,10 @@ class KoleksiBarangPage extends Component {
     this.setState({ loading: true, error: null });
 
     try {
-      const data = await BarangService.searchBarang(keyword);
+      const data = await BarangService.getAllBarang();
 
       this.setState({
-        items: Array.isArray(data) ? data : [],
+        items: this.getVisibleItems(data, keyword),
         loading: false,
         currentPage: 1, // Reset ke halaman pertama setiap kali mencari barang
       });
@@ -292,28 +388,16 @@ class KoleksiBarangPage extends Component {
     const totalPages = Math.ceil(items.length / itemsPerPage);
 
     return (
-      <div className="flex min-h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans']">
-        <Sidebar
-          expanded={isSidebarExpanded}
-          currentPath="/koleksi"
-          handleLogout={this.handleLogout}
-          navigate={this.props.navigate}
-        />
-
-        <main
-          className={`
-            flex-1 px-6 md:px-12 py-8 overflow-y-auto
-            transition-[margin] duration-300
-            ${isSidebarExpanded ? "ml-64" : "ml-16"}
-          `}
-        >
-          <PageHeader
-            onToggleSidebar={this.toggleSidebar}
-            navigate={this.props.navigate}
-            showAdminModeButton={true}
-            userRole={user.role}
-            userName={user.username}
-          />
+      <>
+      <UserPageLayout
+        currentPath="/koleksi"
+        isSidebarExpanded={isSidebarExpanded}
+        onToggleSidebar={this.toggleSidebar}
+        onLogout={this.handleLogout}
+        navigate={this.props.navigate}
+        userRole={user.role}
+        userName={user.username}
+      >
 
           <section className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
@@ -495,9 +579,9 @@ class KoleksiBarangPage extends Component {
                       return (
                         <div
                           key={itemId}
-                          className="bg-white rounded-[28px] p-3 border border-gray-50 shadow-sm hover:shadow-xl transition-all group"
+                          className="bg-white rounded-[28px] p-3 border border-gray-50 shadow-sm hover:shadow-xl transition-all group h-full flex flex-col"
                         >
-                          <div className="relative aspect-square rounded-[22px] overflow-hidden bg-gray-100">
+                          <div className="relative aspect-square rounded-[22px] overflow-hidden bg-gray-100 shrink-0">
                             <img
                               src={normalizedItem.foto_url}
                               alt={normalizedItem.nama_barang}
@@ -520,29 +604,33 @@ class KoleksiBarangPage extends Component {
                             </div>
                           </div>
 
-                          <div className="p-4">
+                          <div className="p-4 flex-1 flex flex-col">
                             <p className="text-[9px] font-black text-yellow-600 uppercase mb-1">
                               {normalizedItem.kategori || "Kategori"}
                             </p>
 
-                            <h4 className="font-bold text-[#002B5B] text-base mb-1 truncate">
+                            <h4 className="font-bold text-[#002B5B] text-base mb-1 min-h-[24px] truncate">
                               {normalizedItem.nama_barang}
                             </h4>
 
-                            <div className="flex items-center gap-2 text-gray-400 text-[10px] mb-4">
+                            <div className="flex items-center gap-2 text-gray-500 text-[11px] mb-4 font-medium min-h-[18px]">
                               <i className="fas fa-map-marker-alt text-yellow-600"></i>
-                              <span className="truncate">{normalizedItem.lokasi}</span>
+                              <span className="truncate">{normalizedItem.lokasi || "-"}</span>
                             </div>
 
-                            <div className="flex justify-between items-center border-t border-gray-50 pt-4">
-                              <span className="text-[9px] text-gray-300 font-bold tracking-tighter">
-                                ID: #{itemId}
+                            <div className="flex justify-between items-center border-t border-gray-50 pt-4 mt-auto gap-3">
+                              <span className="text-[12px] text-gray-600 font-bold">
+                                <i className="far fa-calendar-alt text-yellow-600 mr-1"></i>
+                                {normalizedItem.status_barang === "hilang"
+                                  ? "Hilang"
+                                  : "Ditemukan"}
+                                : {normalizedItem.tanggal_kejadian || "-"}
                               </span>
 
                               <button
                                 type="button"
                                 onClick={() => this.openModal(normalizedItem)}
-                                className="text-[10px] font-black text-[#002B5B] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+                                className="bg-[#002B5B] text-white text-[10px] font-black px-4 py-2 rounded-lg hover:bg-[#001F42] transition-colors shadow-sm"
                               >
                                 DETAIL
                               </button>
@@ -560,16 +648,16 @@ class KoleksiBarangPage extends Component {
             </section>
           </div>
 
-          <PageFooter />
-        </main>
+      </UserPageLayout>
 
         {this.state.isModalOpen && (
           <ModalDetail
             data={this.state.selectedBarang}
             onClose={this.closeModal}
+            navigate={this.props.navigate}
           />
         )}
-      </div>
+      </>
     );
   }
 }

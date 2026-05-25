@@ -131,7 +131,7 @@ class LoginPage extends Component {
 
           {/* Form Utama */}
           <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
-            <h3 className="text-3xl font-extrabold text-[#002B5B] text-center mb-10">Masuk NEMU IPB</h3>
+            <h3 className="text-3xl font-extrabold text-[#002B5B] text-center mb-10">Login NEMU IPB</h3>
             
             <form onSubmit={this.handleLogin} className="space-y-6">
                 {/* Input Username - Label dipaksa ke kiri */}

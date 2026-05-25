@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy import func
 from app.utils.security import get_current_user
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan
@@ -24,23 +23,6 @@ def buat_laporan_kehilangan(
     current_user: User = Depends(get_current_user)
 ):
     db = SessionLocal()
-
-    duplikat = (
-        db.query(Laporan)
-        .join(Barang, Laporan.barang_id == Barang.barang_id)
-        .filter(
-            Laporan.jenis_laporan == "kehilangan",
-            func.lower(func.trim(Barang.nama_barang)) == data.nama_barang.strip().lower()
-        )
-        .first()
-    )
-
-    if duplikat:
-        db.close()
-        raise HTTPException(
-            status_code=400,
-            detail="Nama barang sudah pernah dilaporkan sebagai kehilangan"
-        )
 
     barang_baru = Barang(
         nama_barang=data.nama_barang,
@@ -83,23 +65,6 @@ def buat_laporan_kehilangan(
 def buat_laporan_penemuan(data: LaporanCreate,
     current_user: User = Depends(get_current_user)):
     db = SessionLocal()
-
-    duplikat = (
-        db.query(Laporan)
-        .join(Barang, Laporan.barang_id == Barang.barang_id)
-        .filter(
-            Laporan.jenis_laporan == "penemuan",
-            func.lower(func.trim(Barang.nama_barang)) == data.nama_barang.strip().lower()
-        )
-        .first()
-    )
-
-    if duplikat:
-        db.close()
-        raise HTTPException(
-            status_code=400,
-            detail="Nama barang sudah pernah dilaporkan sebagai penemuan"
-        )
 
     barang_baru = Barang(
         nama_barang=data.nama_barang,
@@ -164,9 +129,13 @@ def get_laporan_kehilangan_user(
             "kategori": barang.kategori,
             "lokasi": barang.lokasi,
             "tanggal_kejadian": barang.tanggal_kejadian,
+            "created_time": barang.created_time,
             "status_laporan": laporan.status_laporan,
+            "status_verifikasi": laporan.status_verifikasi,
             "jenis_laporan": laporan.jenis_laporan,
-            "catatan_verifikasi": laporan.catatan_verifikasi
+            "catatan_verifikasi": encryption_service.decrypt_if_exists(
+                laporan.catatan_verifikasi
+            )
         })
 
     db.close()
@@ -207,6 +176,7 @@ def get_detail_laporan(laporan_id: int):
             "kategori": barang.kategori,
             "deskripsi": barang.deskripsi,
             "tanggal_kejadian": barang.tanggal_kejadian,
+            "created_time": barang.created_time,
             "lokasi": barang.lokasi,
             "dokumentasi": barang.dokumentasi,
             "status_barang": barang.status_barang

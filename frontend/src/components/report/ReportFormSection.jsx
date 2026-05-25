@@ -119,16 +119,12 @@ const isPenemuan = reportType === "penemuan";
                 Elektronik
               </option>
 
-              <option value="Pakaian">
-                Pakaian
-              </option>
-
-              <option value="Aksesoris">
-                Aksesoris
-              </option>
-
               <option value="Alat Tulis">
                 Alat Tulis
+              </option>
+
+              <option value="Barang Pribadi">
+                Barang Pribadi
               </option>
 
               <option value="Lainnya">

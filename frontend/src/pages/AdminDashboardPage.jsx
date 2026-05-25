@@ -19,6 +19,7 @@ class AdminDashboardPage extends Component {
         total_found: 0,
         pending_verification: 0,
         pending_claims: 0,
+        returned_items: 0,
       },
       chart: [],
       reports: [],
@@ -261,7 +262,7 @@ class AdminDashboardPage extends Component {
     if (!chart || chart.length === 0) {
       return (
         <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
-          Belum ada data chart.
+          Belum ada data grafik.
         </div>
       );
     }
@@ -289,7 +290,11 @@ class AdminDashboardPage extends Component {
                   style={{ height: `${Math.max(foundHeight, 8)}%` }}
                 ></div>
               </div>
-              <p className="text-[10px] text-gray-400 mt-4">{item.week}</p>
+              <p className="text-[10px] text-gray-400 mt-4">
+                {String(item.week || "")
+                  .replace(/^wk\s*/i, "Minggu ")
+                  .replace(/^week\s*/i, "Minggu ")}
+              </p>
             </div>
           );
         })}
@@ -392,7 +397,7 @@ class AdminDashboardPage extends Component {
                         : "bg-[#002B5B] text-white"
                     }`}
                   >
-                    Verifikasi
+                    Setujui
                   </button>
 
                   <button
@@ -517,8 +522,7 @@ class AdminDashboardPage extends Component {
                   Selamat Datang Admin
                 </h2>
                 <p className="text-gray-500 text-sm max-w-lg leading-relaxed">
-                  A view of lost and found assets across IPB University campuses.
-                  High-priority verifications are highlighted.
+                  Pantau laporan kehilangan, penemuan, dan klaim barang di lingkungan IPB.
                 </p>
               </div>
 
@@ -529,6 +533,15 @@ class AdminDashboardPage extends Component {
                   </p>
                   <p className="text-2xl font-black text-[#002B5B]">
                     {summary.active_lost}
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-100 px-7 py-4 rounded-xl text-center shadow-sm">
+                  <p className="text-[10px] font-black tracking-widest text-gray-500">
+                    BARANG DIKEMBALIKAN
+                  </p>
+                  <p className="text-2xl font-black text-[#002B5B]">
+                    {summary.returned_items ?? 0}
                   </p>
                 </div>
 
@@ -579,13 +592,16 @@ class AdminDashboardPage extends Component {
                   </h3>
 
                   <p className="text-sm text-white/60 leading-relaxed">
-                    There are {summary.pending_claims} claimants waiting for
-                    identity verification. Quick approval keeps the system fluid.
+                    Ada {summary.pending_claims} klaim barang yang menunggu verifikasi admin.
                   </p>
                 </div>
 
-                <button className="mt-8 w-full bg-[#F4D35E] text-[#5C4A00] py-4 rounded-2xl text-xs font-black tracking-widest hover:scale-105 transition-all">
-                  VERIFY CLAIMANTS
+                <button
+                  type="button"
+                  onClick={() => this.props.navigate("/admin/verifikasi")}
+                  className="mt-8 w-full bg-[#F4D35E] text-[#5C4A00] py-4 rounded-2xl text-xs font-black tracking-widest hover:scale-105 transition-all"
+                >
+                  VERIFIKASI KLAIM
                 </button>
               </div>
             </section>
@@ -655,7 +671,7 @@ class AdminDashboardPage extends Component {
                     </thead>
 
                     <tbody>
-                      {reports.map((report) => {
+                      {[...reports.filter((report) => report.status_verifikasi === "belum_diverifikasi"), ...reports.filter((report) => report.status_verifikasi !== "belum_diverifikasi")].map((report) => {
                         const disabled = this.isFinalStatus(report);
 
                         return (
@@ -702,7 +718,7 @@ class AdminDashboardPage extends Component {
                                     : "bg-[#002B5B] text-white"
                                 }`}
                               >
-                                Verifikasi
+                                Setujui 
                               </button>
 
                               <button

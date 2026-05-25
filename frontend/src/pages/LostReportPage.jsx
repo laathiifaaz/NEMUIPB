@@ -1,8 +1,6 @@
 import React, { Component } from "react";
-import Sidebar from "../components/Sidebar";
 import AuthService from "../services/AuthService";
-import PageHeader from "../components/PageHeader";
-import PageFooter from "../components/PageFooter";
+import UserPageLayout from "../components/UserPageLayout";
 import {
   getStoredSidebarExpanded,
   setStoredSidebarExpanded,
@@ -37,6 +35,7 @@ class LostReportPage extends Component {
       showCancelModal: false,
       showSubmitModal: false,
       showErrorModal: false,
+      errorMessage: "",
       reportSubmitted: false,
 
       errors: {},
@@ -328,32 +327,16 @@ class LostReportPage extends Component {
     const user = AuthService.getCurrentUser();
 
     return (
-      <div className="flex min-h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans']">
-
-        <Sidebar
-          expanded={this.state.isSidebarExpanded}
+      <>
+        <UserPageLayout
           currentPath="/lapor-kehilangan"
-          handleLogout={this.handleLogout}
+          isSidebarExpanded={this.state.isSidebarExpanded}
+          onToggleSidebar={this.toggleSidebar}
+          onLogout={this.handleLogout}
           navigate={this.props.navigate}
-        />
-
-        <main
-          className={`
-            flex-1
-            px-6 md:px-12 py-8
-            overflow-y-auto
-            transition-[margin] duration-300
-            ${this.state.isSidebarExpanded ? "ml-64" : "ml-16"}
-          `}
+          userRole={user.role}
+          userName={user.username}
         >
-
-          <PageHeader
-            onToggleSidebar={this.toggleSidebar}
-            navigate={this.props.navigate}
-            showAdminModeButton={true}
-            userRole={user.role}
-            userName={user.username}
-          />
 
           {this.state.reportSubmitted ? (
             this.renderSuccessState()
@@ -384,20 +367,18 @@ class LostReportPage extends Component {
             </>
           )}
 
-          <PageFooter />
-
-        </main>
+        </UserPageLayout>
 
         <ReportModals
           showCancelModal={this.state.showCancelModal}
           showSubmitModal={this.state.showSubmitModal}
           showErrorModal={this.state.showErrorModal}
+          errorMessage={this.state.errorMessage}
           setState={(data) => this.setState(data)}
           navigate={this.props.navigate}
           handleSubmit={this.handleSubmit}
         />
-
-      </div>
+      </>
     );
   }
 }

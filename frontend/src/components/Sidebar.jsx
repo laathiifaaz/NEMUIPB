@@ -150,7 +150,7 @@ class Sidebar extends Component {
         `}
       >
         {/* LOGO */}
-        <div className="flex items-center gap-4 mb-12 px-1">
+        <div className="flex items-center gap-3 mb-12 px-1 min-h-[56px]">
           <img
             src="/images/logo-nemuipb.png"
             alt="Logo"
@@ -159,20 +159,20 @@ class Sidebar extends Component {
 
           <div
             className={`
-              truncate
+              min-w-0 flex flex-col justify-center
               transition-opacity duration-200
               ${expanded ? "opacity-100" : "opacity-0"}
             `}
           >
             <h1
               onClick={() => this.handleNavigate("/dashboard")}
-              className="font-extrabold text-[#002B5B] text-xl leading-none cursor-pointer"
+              className="font-extrabold text-[#002B5B] text-xl leading-none cursor-pointer whitespace-nowrap"
             >
               NEMU IPB
             </h1>
 
-            <p className="text-xs text-[#56708F] font-extrabold tracking-tight mt-1">
-              IPB LOST & FOUND
+            <p className="text-[11px] text-[#56708F] font-extrabold uppercase tracking-wide mt-1 leading-none whitespace-nowrap">
+              Lost and Found
             </p>
           </div>
         </div>

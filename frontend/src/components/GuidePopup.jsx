@@ -61,7 +61,7 @@ const adminGuideSections = [
       "Cocokkan barang ditemukan dengan laporan kehilangan yang dipilih user.",
       "Klik Tolak Klaim jika data tidak sesuai.",
       "Klik Terima & Buat Serah Terima jika klaim valid.",
-      "Sistem membuat dokumen serah terima, hash, dan digital signature dari BE.",
+      "Sistem membuat dokumen serah terima, hash, dan tanda tangan digital.",
     ],
   },
   {

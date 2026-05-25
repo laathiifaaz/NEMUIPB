@@ -2,9 +2,7 @@
 
 import React, { Component } from 'react';
 import AuthService from '../services/AuthService';
-import Sidebar from '../components/Sidebar';
-import PageHeader from '../components/PageHeader';
-import PageFooter from '../components/PageFooter';
+import UserPageLayout from '../components/UserPageLayout';
 import BarangService from "../services/BarangService";
 import ModalDetail from "../components/ModalDetail";
 
@@ -48,12 +46,17 @@ class DashboardPage extends Component {
 
       const data = await BarangService.getAllBarang();
       const items = Array.isArray(data) ? data : [];
+      const verifiedItems = items.filter(
+        (item) =>
+          item.status_verifikasi === "terverifikasi" &&
+          item.status_laporan === "disetujui"
+      );
 
-      const sortedItems = items
+      const sortedItems = verifiedItems
         .filter(
           (item) =>
             item.jenis_laporan === "penemuan" &&
-            item.status_barang !== "selesai"
+            item.status_barang === "ditemukan"
         )
         .sort(
           (a, b) =>
@@ -64,9 +67,9 @@ class DashboardPage extends Component {
 
       this.setState({
         recentItems: sortedItems,
-        totalLostItems: items.filter((item) => item.status_barang === "hilang")
+        totalLostItems: verifiedItems.filter((item) => item.status_barang === "ditemukan")
           .length,
-        totalReturnedItems: items.filter((item) =>
+        totalReturnedItems: verifiedItems.filter((item) =>
           ["selesai", "dikembalikan"].includes(item.status_barang)
         ).length,
         loadingRecent: false,
@@ -91,12 +94,17 @@ class DashboardPage extends Component {
     try {
       const data = await BarangService.getAllBarang();
       const items = Array.isArray(data) ? data : [];
+      const verifiedItems = items.filter(
+        (item) =>
+          item.status_verifikasi === "terverifikasi" &&
+          item.status_laporan === "disetujui"
+      );
 
-      const sortedItems = [...items]
+      const sortedItems = [...verifiedItems]
         .filter(
           (item) =>
             item.jenis_laporan === "penemuan" &&
-            item.status_barang !== "selesai"
+            item.status_barang === "ditemukan"
         )
         .sort((a, b) => {
           return (
@@ -108,9 +116,9 @@ class DashboardPage extends Component {
 
       this.setState({
         recentItems: sortedItems,
-        totalLostItems: items.filter((item) => item.status_barang === "hilang")
+        totalLostItems: verifiedItems.filter((item) => item.status_barang === "ditemukan")
           .length,
-        totalReturnedItems: items.filter((item) =>
+        totalReturnedItems: verifiedItems.filter((item) =>
           ["selesai", "dikembalikan"].includes(item.status_barang)
         ).length,
         loadingRecent: false,
@@ -227,17 +235,17 @@ class DashboardPage extends Component {
                     {item.nama_barang}
                   </h4>
 
-                  <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+                  <div className="flex items-center gap-2 text-gray-500 text-xs mb-1 font-medium">
                     <i className="fas fa-map-marker-alt text-[#9A7D0A]"></i>
-                    <span>{item.lokasi}</span>
+                    <span className="truncate">{item.lokasi || "-"}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-gray-300 text-[10px] mb-4">
+                  <div className="flex items-center gap-2 text-gray-600 text-[11px] mb-4 font-bold">
                     <i className="far fa-calendar-alt text-[#9A7D0A]"></i>
                     <span>
                       {item.status_barang === "hilang"
-                        ? "Tanggal Hilang"
-                        : "Tanggal Ditemukan"}
+                        ? "Hilang"
+                        : "Ditemukan"}
                       : {item.tanggal_kejadian}
                     </span>
                   </div>
@@ -267,8 +275,76 @@ class DashboardPage extends Component {
             <ModalDetail
               data={this.state.selectedBarang}
               onClose={this.closeModal}
+              navigate={this.props.navigate}
             />
           )}
+        </div>
+      </section>
+    );
+  }
+
+  renderPickupLocation() {
+    return (
+      <section className="bg-[#F8FAFC] border border-gray-100 rounded-[28px] p-6 md:p-8 mb-16">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#9A7D0A] mb-2">
+              Tempat Pengambilan Barang
+            </p>
+            <h3 className="text-2xl font-extrabold text-[#002B5B] mb-2">
+              Pos Keamanan Asrama IPB
+            </h3>
+            <a
+              href="https://www.google.com/maps/search/?api=1&query=Kampus%20IPB%20Dramaga%20Bogor"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-500 leading-relaxed hover:text-[#002B5B] hover:underline"
+            >
+              Kampus IPB Dramaga, Bogor
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
+            <a
+              href="https://www.google.com/maps/search/?api=1&query=Kampus%20IPB%20Dramaga%20Bogor"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white rounded-2xl px-4 py-4 border border-gray-100 hover:border-[#002B5B] transition-all"
+            >
+              <i className="fas fa-map-marker-alt text-[#002B5B] mb-3"></i>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                Alamat
+              </p>
+              <p className="text-sm font-bold text-[#002B5B]">
+                Kampus IPB Dramaga, Bogor
+              </p>
+            </a>
+
+            <div className="bg-white rounded-2xl px-4 py-4 border border-gray-100">
+              <i className="far fa-clock text-[#9A7D0A] mb-3"></i>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                Jam Operasional
+              </p>
+              <p className="text-sm font-bold text-[#002B5B]">
+                Senin - Jumat, 08.00 - 17.00 WIB
+              </p>
+            </div>
+
+            <a
+              href="https://wa.me/6281234567890"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white rounded-2xl px-4 py-4 border border-gray-100 hover:border-[#002B5B] transition-all"
+            >
+              <i className="fas fa-phone-alt text-[#002B5B] mb-3"></i>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                WhatsApp
+              </p>
+              <p className="text-sm font-bold text-[#002B5B]">
+                +62 812-3456-7890
+              </p>
+            </a>
+          </div>
         </div>
       </section>
     );
@@ -287,31 +363,16 @@ class DashboardPage extends Component {
   } = this.state;
 
     return (
-      <div className="flex min-h-screen bg-white font-['Plus_Jakarta_Sans'] overflow-hidden">
-
-        {/* SIDEBAR COMPONENT */}
-        <Sidebar
-          expanded={isSidebarExpanded}
-          handleLogout={this.handleLogout}
-          navigate={this.props.navigate}
-        />
-
-        {/* MAIN CONTENT */}
-        <main
-          className={`
-            flex-1 overflow-y-auto px-6 md:px-12 py-8
-            transition-[margin] duration-300
-            ${isSidebarExpanded ? "ml-64" : "ml-16"}
-          `}
-        >
-
-          <PageHeader
-            onToggleSidebar={this.toggleSidebar}
-            navigate={this.props.navigate}
-            showAdminModeButton={true}
-            userRole={userRole}
-            userName={userName}
-          />
+      <UserPageLayout
+        currentPath="/dashboard"
+        isSidebarExpanded={isSidebarExpanded}
+        onToggleSidebar={this.toggleSidebar}
+        onLogout={this.handleLogout}
+        navigate={this.props.navigate}
+        userRole={userRole}
+        userName={userName}
+        backgroundClass="bg-white"
+      >
 
           {/* HERO */}
           <section className="bg-white rounded-[40px] border border-gray-100 p-8 md:p-12 flex flex-col lg:flex-row items-center mb-16 shadow-sm">
@@ -327,7 +388,7 @@ class DashboardPage extends Component {
                 <br />
 
                 <span className="text-[#9A7D0A] italic font-medium text-3xl md:text-4xl">
-                  temukan kembali dengan tenang.
+                  temukan kembali barang anda
                 </span>
               </h1>
 
@@ -342,7 +403,7 @@ class DashboardPage extends Component {
                   className="bg-[#002B5B] text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 text-sm hover:scale-105 transition-transform shadow-xl shadow-blue-900/20"
                 >
                   <i className="fas fa-search-plus"></i>
-                  Laporkan Barang Hilang
+                  Lapor Kehilangan
                 </button>
 
                 <button
@@ -351,7 +412,7 @@ class DashboardPage extends Component {
                 >
 
                   <i className="fas fa-plus-circle"></i>
-                  Laporkan Barang Penemuan
+                  Lapor Penemuan
 
                 </button>
               </div>
@@ -377,7 +438,7 @@ class DashboardPage extends Component {
                     <div className="flex items-center gap-2 text-[#002B5B] mt-2">
                       <i className="fas fa-search text-xs"></i>
                       <p className="text-[10px] font-black uppercase tracking-widest">
-                        Barang Ditemukan
+                        Barang Penemuan
                       </p>
                     </div>
                   </div>
@@ -451,111 +512,8 @@ class DashboardPage extends Component {
             </button>
           </section>
 
-          <section className="bg-[#F8FAFC] border border-gray-100 rounded-[28px] p-6 md:p-8 mb-16">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#9A7D0A] mb-2">
-                  Tips Cepat
-                </p>
-                <h3 className="text-2xl font-extrabold text-[#002B5B] mb-2">
-                  Buat laporan lebih mudah diverifikasi
-                </h3>
-                <p className="text-sm text-gray-500 max-w-2xl leading-relaxed">
-                  Gunakan foto yang jelas, lokasi spesifik, dan tanggal kejadian yang akurat agar admin bisa memproses laporan lebih cepat.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 min-w-full lg:min-w-[330px]">
-                <div className="bg-white rounded-2xl px-4 py-4 text-center border border-gray-100">
-                  <i className="fas fa-camera text-[#002B5B] mb-2"></i>
-                  <p className="text-[11px] font-extrabold text-gray-500">
-                    Foto jelas
-                  </p>
-                </div>
-
-                <div className="bg-white rounded-2xl px-4 py-4 text-center border border-gray-100">
-                  <i className="fas fa-map-marker-alt text-[#9A7D0A] mb-2"></i>
-                  <p className="text-[11px] font-extrabold text-gray-500">
-                    Lokasi detail
-                  </p>
-                </div>
-
-                <div className="bg-white rounded-2xl px-4 py-4 text-center border border-gray-100">
-                  <i className="far fa-calendar-alt text-[#002B5B] mb-2"></i>
-                  <p className="text-[11px] font-extrabold text-gray-500">
-                    Tanggal tepat
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="mb-16">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#9A7D0A] mb-2">
-                  Proses Laporan
-                </p>
-                <h3 className="text-2xl font-extrabold text-[#002B5B]">
-                  Setelah laporan dikirim
-                </h3>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white border border-gray-100 rounded-[22px] p-5">
-                <span className="w-10 h-10 rounded-xl bg-[#EAF2FF] text-[#002B5B] flex items-center justify-center mb-4 font-black">
-                  1
-                </span>
-                <h4 className="font-extrabold text-[#002B5B] mb-2">
-                  Laporan Masuk
-                </h4>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Data barang tersimpan dan masuk ke antrean verifikasi.
-                </p>
-              </div>
-
-              <div className="bg-white border border-gray-100 rounded-[22px] p-5">
-                <span className="w-10 h-10 rounded-xl bg-[#F8E9A8] text-[#5C4A00] flex items-center justify-center mb-4 font-black">
-                  2
-                </span>
-                <h4 className="font-extrabold text-[#002B5B] mb-2">
-                  Dicek Admin
-                </h4>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Admin memeriksa foto, lokasi, dan detail laporan.
-                </p>
-              </div>
-
-              <div className="bg-white border border-gray-100 rounded-[22px] p-5">
-                <span className="w-10 h-10 rounded-xl bg-[#EAF2FF] text-[#002B5B] flex items-center justify-center mb-4 font-black">
-                  3
-                </span>
-                <h4 className="font-extrabold text-[#002B5B] mb-2">
-                  Status Diperbarui
-                </h4>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Kamu bisa melihat hasil verifikasi di halaman laporan.
-                </p>
-              </div>
-
-              <div className="bg-white border border-gray-100 rounded-[22px] p-5">
-                <span className="w-10 h-10 rounded-xl bg-[#F8E9A8] text-[#5C4A00] flex items-center justify-center mb-4 font-black">
-                  4
-                </span>
-                <h4 className="font-extrabold text-[#002B5B] mb-2">
-                  Barang Diproses
-                </h4>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Barang yang cocok akan diarahkan untuk proses pengembalian.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <PageFooter />
-        </main>
-      </div>
+          {this.renderPickupLocation()}
+      </UserPageLayout>
     );
   }
 }

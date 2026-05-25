@@ -8,9 +8,10 @@ import FindReportPage from "./pages/FindReportPage";
 import VerificationReportPage from "./pages/VerificationReportPage.jsx";
 import AdminBarangPage from "./pages/AdminBarangPage.jsx";
 import AdminVerificationPage from "./pages/AdminVerificationPage";
-import KoleksiBarangPage from "./pages/KoleksiBarangPage.js";
+import KoleksiBarangPage from "./pages/KoleksiBarangPage.jsx";
 import UserManagementPage from "./pages/UserManagementPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticPage.jsx";
+import ClaimBarangPage from "./pages/ClaimBarangPage.jsx";
 
 import AuthService from "./services/AuthService";
 
@@ -21,7 +22,37 @@ class App extends Component {
     this.state = {
       isLoggedIn: AuthService.isLoggedIn(),
       currentPath: window.location.pathname,
+      sessionExpired: false,
+      sessionMessage: "",
     };
+  }
+
+  componentDidMount() {
+    window.addEventListener("session-expired", this.handleSessionExpired);
+    this.originalFetch = window.fetch;
+
+    window.fetch = async (...args) => {
+      const response = await this.originalFetch.apply(window, args);
+      const requestUrl = String(args[0] || "");
+      const isLoginRequest = requestUrl.includes("/auth/login");
+
+      if (response.status === 401 && !isLoginRequest) {
+        window.dispatchEvent(
+          new CustomEvent("session-expired", {
+            detail: "Sesi Anda sudah berakhir. Silakan login ulang.",
+          })
+        );
+      }
+
+      return response;
+    };
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("session-expired", this.handleSessionExpired);
+    if (this.originalFetch) {
+      window.fetch = this.originalFetch;
+    }
   }
 
   handleLoginSuccess = () => {
@@ -39,6 +70,23 @@ class App extends Component {
     this.setState({
       isLoggedIn: false,
       currentPath: "/login",
+      sessionExpired: false,
+      sessionMessage: "",
+    });
+
+    window.history.pushState({}, "", "/login");
+  };
+
+  handleSessionExpired = (event) => {
+    AuthService.logout();
+
+    this.setState({
+      isLoggedIn: false,
+      currentPath: "/login",
+      sessionExpired: true,
+      sessionMessage:
+        event.detail ||
+        "Sesi Anda sudah berakhir. Silakan login ulang.",
     });
 
     window.history.pushState({}, "", "/login");
@@ -71,6 +119,17 @@ class App extends Component {
     // Koleksi barang
     if (currentPath === "/koleksi") {
       return <KoleksiBarangPage navigate={this.navigate} />;
+    }
+
+    if (currentPath.startsWith("/klaim/")) {
+      const barangId = currentPath.split("/")[2];
+
+      return (
+        <ClaimBarangPage
+          navigate={this.navigate}
+          barangId={barangId}
+        />
+      );
     }
 
     // Admin dashboard
@@ -148,7 +207,42 @@ class App extends Component {
   }
 
   render() {
-    return <div>{this.renderPage()}</div>;
+    return (
+      <div>
+        {this.renderPage()}
+
+        {this.state.sessionExpired && (
+          <div className="fixed inset-0 z-[10000] bg-black/50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-[28px] w-full max-w-sm p-7 text-center shadow-2xl">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 text-[#002B5B] flex items-center justify-center">
+                <i className="fas fa-lock text-xl"></i>
+              </div>
+
+              <h2 className="text-2xl font-extrabold text-[#002B5B] mb-2">
+                Sesi Berakhir
+              </h2>
+
+              <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                {this.state.sessionMessage}
+              </p>
+
+              <button
+                type="button"
+                onClick={() =>
+                  this.setState({
+                    sessionExpired: false,
+                    sessionMessage: "",
+                  })
+                }
+                className="w-full bg-[#002B5B] text-white rounded-xl px-5 py-3 text-sm font-black hover:bg-[#001f42] transition-colors"
+              >
+                Login Ulang
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 }
 

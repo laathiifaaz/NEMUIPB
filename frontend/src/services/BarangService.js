@@ -45,6 +45,15 @@ class BarangService extends ApiService {
 
     return this.handleResponse(res);
   }
+
+  async batalkanKlaim(klaimId) {
+    const res = await fetch(`${this.baseUrl}/klaim/${klaimId}/batal`, {
+      method: "PATCH",
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse(res);
+  }
 }
 
 const barangService = new BarangService();

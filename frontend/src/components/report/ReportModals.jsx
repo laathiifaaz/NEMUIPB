@@ -6,6 +6,7 @@ const ReportModals = ({
   showCancelModal,
   showSubmitModal,
   showErrorModal,
+  errorMessage,
   setState,
   navigate,
   handleSubmit,
@@ -117,8 +118,8 @@ const ReportModals = ({
               Form Belum Lengkap
             </h2>
 
-            <p className="text-gray-500 mb-8">
-              Mohon isi semua field yang wajib diisi.
+            <p className="text-gray-500 mb-8 whitespace-pre-line text-left">
+              {errorMessage || "Mohon isi semua field yang wajib diisi."}
             </p>
 
             <button

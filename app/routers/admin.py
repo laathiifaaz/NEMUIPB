@@ -56,7 +56,11 @@ def get_all_laporan(
             "lokasi": barang.lokasi,
             "dokumentasi": barang.dokumentasi,
             "tanggal_kejadian": barang.tanggal_kejadian,
-            "status_barang": barang.status_barang
+            "status_barang": barang.status_barang,
+            "created_time": barang.created_time,
+            "catatan_verifikasi": encryption_service.decrypt_if_exists(
+                laporan.catatan_verifikasi
+            )
         })
 
     db.close()
@@ -110,7 +114,10 @@ def get_recent_laporan(
             "dokumentasi": barang.dokumentasi,
             "tanggal_kejadian": barang.tanggal_kejadian,
             "status_barang": barang.status_barang,
-            "catatan_verifikasi": laporan.catatan_verifikasi,
+            "created_time": barang.created_time,
+            "catatan_verifikasi": encryption_service.decrypt_if_exists(
+                laporan.catatan_verifikasi
+            ),
             "tanggal_verifikasi": laporan.tanggal_verifikasi
         })
 
@@ -328,13 +335,18 @@ def get_admin_dashboard_summary(
         KlaimBarang.status_klaim == "diproses"
     ).count()
 
+    returned_items = db.query(Barang).filter(
+        Barang.status_barang == "selesai"
+    ).count()
+
     db.close()
 
     return {
         "active_lost": active_lost,
         "total_found": total_found,
         "pending_verification": pending_verification,
-        "pending_claims": pending_claims
+        "pending_claims": pending_claims,
+        "returned_items": returned_items
     }
 
 @router.get("/dashboard/chart")
@@ -402,13 +414,16 @@ def export_laporan(
             "jenis_laporan": laporan.jenis_laporan,
             "status_laporan": laporan.status_laporan,
             "status_verifikasi": laporan.status_verifikasi,
-            "catatan_verifikasi": laporan.catatan_verifikasi,
+            "catatan_verifikasi": encryption_service.decrypt_if_exists(
+                laporan.catatan_verifikasi
+            ),
             "tanggal_verifikasi": laporan.tanggal_verifikasi,
             "barang_id": barang.barang_id,
             "nama_barang": barang.nama_barang,
             "kategori": barang.kategori,
             "lokasi": barang.lokasi,
             "tanggal_kejadian": barang.tanggal_kejadian,
+            "created_time": barang.created_time,
             "status_barang": barang.status_barang
         })
 

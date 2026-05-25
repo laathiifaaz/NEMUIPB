@@ -28,6 +28,7 @@ class Barang(Base):
     lokasi = Column(String)
     dokumentasi = Column(Text)
     status_barang = Column(String)
+    created_time = Column(TIMESTAMP, server_default=func.now())
 
 
 class Laporan(Base):

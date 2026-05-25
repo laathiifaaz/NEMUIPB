@@ -65,7 +65,7 @@ const Datepicker = ({
 
       {error && (
         <p className="text-red-500 text-xs mt-2">
-          Wajib diisi
+          {error}
         </p>
       )}
     </div>
