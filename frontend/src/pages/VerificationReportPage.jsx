@@ -644,10 +644,18 @@ class VerificationReportPage extends Component {
                     {/* HEADER */}
                     <div className="flex justify-between items-start mb-8">
 
-                      <div>
+                      <div className="min-w-0 pr-4">
 
                         <p className="text-[13px] text-gray-500">
                           Tracking status verifikasi laporan
+                        </p>
+
+                        <h2 className="text-2xl font-black text-[#0B2B5B] mt-1 truncate">
+                          {selectedReport.nama_barang}
+                        </h2>
+
+                        <p className="text-[11px] text-gray-400 font-semibold mt-1 capitalize">
+                          Laporan {selectedReport.jenis_laporan || "-"} #{selectedReport.laporan_id}
                         </p>
 
                       </div>
@@ -738,6 +746,7 @@ class VerificationReportPage extends Component {
                 </div>
 
               </div>
+
               {/* STEP 2 */}
               <div className="flex gap-4">
 
@@ -1280,6 +1289,9 @@ class VerificationReportPage extends Component {
                           #IPB-{selectedReport.laporan_id}
                         </p>
                         <div className="w-full border-t border-dashed border-gray-200 my-4"></div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                          Barang yang diambil
+                        </p>
                         <p className="text-sm font-black">
                           {selectedReport.nama_barang}
                         </p>
@@ -1308,150 +1320,73 @@ class VerificationReportPage extends Component {
                     Lokasi Pengambilan Barang
                   </h3>
 
-                  {selectedPickupNotification && (
-                    <div className="bg-white rounded-2xl p-4 mb-5 border border-blue-100">
-                      <p className="text-[11px] font-black uppercase tracking-widest text-[#2563EB] mb-2">
-                        Klaim Diterima
-                      </p>
-                      <div className="grid grid-cols-1 gap-3 text-[13px] text-gray-600">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                            Tempat
-                          </p>
-                          <p className="font-bold text-[#0B2B5B]">
-                            Pos Keamanan Asrama IPB
-                          </p>
-                          <a
-                            href="https://www.google.com/maps/search/?api=1&query=Kampus%20IPB%20Dramaga%20Bogor"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-gray-500 hover:text-[#0B2B5B] hover:underline"
-                          >
-                            Kampus IPB Dramaga, Bogor
-                          </a>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                            Waktu
-                          </p>
-                          <p className="font-bold text-[#0B2B5B]">
-                            Senin - Jumat, 08.00 - 17.00 WIB
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                            Kontak
-                          </p>
-                          <p className="font-bold text-[#0B2B5B]">
-                            +62 812-3456-7890
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="space-y-5">
 
-                  {/* LOKASI */}
-                  <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+                        <i className="fas fa-map-marker-alt text-[#0B2B5B]"></i>
+                      </div>
 
-                    <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-sm">
-
-                      <i className="fas fa-map-marker-alt text-[#0B2B5B]"></i>
-
+                      <div>
+                        <p className="text-[11px] text-gray-400 mb-1">
+                          Lokasi Pengambilan
+                        </p>
+                        <h4 className="text-[15px] font-bold text-[#0B2B5B]">
+                          Pos Keamanan Asrama IPB
+                        </h4>
+                        <a
+                          href="https://www.google.com/maps/search/?api=1&query=Kampus%20IPB%20Dramaga%20Bogor"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[12px] text-gray-500 mt-1 inline-block hover:text-[#0B2B5B] hover:underline"
+                        >
+                          Kampus IPB Dramaga, Bogor
+                        </a>
+                      </div>
                     </div>
 
-                    <div>
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+                        <i className="far fa-clock text-[#0B2B5B]"></i>
+                      </div>
 
-                      <p className="text-[11px] text-gray-400 mb-1">
-                        Lokasi Pengambilan
-                      </p>
-
-                      <h4 className="text-[15px] font-bold text-[#0B2B5B]">
-                        Pos Keamanan Asrama IPB
-                      </h4>
-
-                      <a
-                        href="https://www.google.com/maps/search/?api=1&query=Kampus%20IPB%20Dramaga%20Bogor"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[12px] text-gray-500 mt-1 inline-block hover:text-[#0B2B5B] hover:underline"
-                      >
-                        Kampus IPB Dramaga, Bogor
-                      </a>
-
+                      <div>
+                        <p className="text-[11px] text-gray-400 mb-1">
+                          Jam Operasional
+                        </p>
+                        <h4 className="text-[15px] font-bold text-[#0B2B5B]">
+                          08.00 - 17.00 WIB
+                        </h4>
+                        <p className="text-[12px] text-gray-500 mt-1">
+                          Senin - Jumat
+                        </p>
+                      </div>
                     </div>
 
-                  </div>
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+                        <i className="fas fa-phone-alt text-[#0B2B5B]"></i>
+                      </div>
 
-                  {/* JAM */}
-                  <div className="flex items-start gap-4">
-
-                    <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-sm">
-
-                      <i className="far fa-clock text-[#0B2B5B]"></i>
-
-                    </div>
-
-                    <div>
-
-                      <p className="text-[11px] text-gray-400 mb-1">
-                        Jam Operasional
-                      </p>
-
-                      <h4 className="text-[15px] font-bold text-[#0B2B5B]">
-                        08.00 - 17.00 WIB
-                      </h4>
-
-                      <p className="text-[12px] text-gray-500 mt-1">
-                        Senin - Jumat
-                      </p>
-
-                    </div>
-
-                  </div>
-
-                  {/* KONTAK */}
-                  <div className="flex items-start gap-4">
-
-                    <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-sm">
-
-                      <i className="fas fa-phone-alt text-[#0B2B5B]"></i>
-
-                    </div>
-
-                    <div>
-
-                      <p className="text-[11px] text-gray-400 mb-1">
-                        Kontak Petugas
-                      </p>
-
+                      <div>
+                        <p className="text-[11px] text-gray-400 mb-1">
+                          Kontak Petugas
+                        </p>
                         <a
                           href="https://wa.me/6281234567890"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="
-                            text-[15px]
-                            font-bold
-                            text-[#0B2B5B]
-                            hover:text-gray-400
-                            transition-all
-                            hover:underline
-                          "
+                          className="text-[15px] font-bold text-[#0B2B5B] hover:text-gray-400 transition-all hover:underline"
                         >
                           +62 812-3456-7890
                         </a>
-
-                      <p className="text-[12px] text-gray-500 mt-1">
-                        Admin NEMU IPB
-                      </p>
-
+                        <p className="text-[12px] text-gray-500 mt-1">
+                          Admin NEMU IPB
+                        </p>
+                      </div>
                     </div>
 
                   </div>
-
-                </div>
-
                 </div>
 
               </div>
