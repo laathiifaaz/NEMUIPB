@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy import asc, desc
 from app.utils.security import get_current_user
 
 from app.database import SessionLocal
@@ -15,7 +16,11 @@ def get_notifikasi( current_user: User = Depends(get_current_user)):
 
     notifikasi = db.query(Notifikasi).filter(
         Notifikasi.user_id == current_user.user_id
-    ).order_by(Notifikasi.tanggal_kirim.desc()).all()
+    ).order_by(
+        asc(Notifikasi.status_baca),
+        desc(Notifikasi.tanggal_kirim),
+        desc(Notifikasi.notifikasi_id)
+    ).all()
 
     db.close()
     return notifikasi

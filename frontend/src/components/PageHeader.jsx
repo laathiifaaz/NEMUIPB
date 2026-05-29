@@ -75,6 +75,29 @@ const isNotificationUnread = (notification, isAdmin) => {
   return !notification.status_baca;
 };
 
+const getNotificationTimestamp = (notification) => {
+  const value =
+    notification.tanggal_kirim ||
+    notification.tanggal_verifikasi ||
+    notification.tanggal_laporan;
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+const sortUserNotifications = (notifications) =>
+  [...notifications].sort((a, b) => {
+    const unreadDiff = Number(Boolean(a.status_baca)) - Number(Boolean(b.status_baca));
+
+    if (unreadDiff !== 0) return unreadDiff;
+
+    const timeDiff = getNotificationTimestamp(b) - getNotificationTimestamp(a);
+
+    if (timeDiff !== 0) return timeDiff;
+
+    return Number(b.notifikasi_id || 0) - Number(a.notifikasi_id || 0);
+  });
+
 const getStoredNotificationScope = () => {
   if (typeof window === "undefined") return "admin";
 
@@ -219,7 +242,7 @@ const NotificationBell = ({ navigate }) => {
         );
 
         if (isMounted) {
-          setUserNotifications(enrichedNotifications);
+          setUserNotifications(sortUserNotifications(enrichedNotifications));
           setLoading(false);
         }
       } catch (error) {
@@ -277,10 +300,12 @@ const NotificationBell = ({ navigate }) => {
 
     if (!notification.status_baca) {
       setUserNotifications((current) =>
-        current.map((item) =>
-          item.notifikasi_id === notification.notifikasi_id
-            ? { ...item, status_baca: true }
-            : item
+        sortUserNotifications(
+          current.map((item) =>
+            item.notifikasi_id === notification.notifikasi_id
+              ? { ...item, status_baca: true }
+              : item
+          )
         )
       );
 
@@ -288,10 +313,12 @@ const NotificationBell = ({ navigate }) => {
         await NotifikasiService.markAsRead(notification.notifikasi_id);
       } catch (error) {
         setUserNotifications((current) =>
-          current.map((item) =>
-            item.notifikasi_id === notification.notifikasi_id
-              ? { ...item, status_baca: false }
-              : item
+          sortUserNotifications(
+            current.map((item) =>
+              item.notifikasi_id === notification.notifikasi_id
+                ? { ...item, status_baca: false }
+                : item
+            )
           )
         );
       }
