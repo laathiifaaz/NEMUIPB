@@ -8,9 +8,12 @@ from passlib.context import CryptContext
 from app.database import SessionLocal
 from app.models import User
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(BACKEND_ROOT.parent / ".env")
+load_dotenv(BACKEND_ROOT / ".env", override=True)
 
 security = HTTPBearer()
 

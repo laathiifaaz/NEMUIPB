@@ -1,10 +1,13 @@
 import os
+from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
 
 
-load_dotenv()
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(BACKEND_ROOT.parent / ".env")
+load_dotenv(BACKEND_ROOT / ".env", override=True)
 
 
 class EncryptionService:

@@ -1,15 +1,23 @@
+# Environment
+.env
+backend/.env
+frontend/.env
+
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/
 
-# Environment
-.env
-
-# OS files
-.DS_Store
-
-# Virtual environment
+# Virtual environments
+.venv/
 venv/
+env/
 
-# Alat bantu hash
-hash_password.py
+# Frontend
+frontend/node_modules/
+frontend/build/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

@@ -23,7 +23,7 @@ from reportlab.platypus import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "Threat_Modeling.pdf"
+OUT = ROOT / "docs" / "Threat_Modeling.pdf"
 
 
 ACCENT = colors.HexColor("#1F4D78")
@@ -550,6 +550,8 @@ def add_remediation(story, styles):
 
 
 def build():
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+
     styles = build_styles()
     doc = BaseDocTemplate(
         str(OUT),
