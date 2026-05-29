@@ -1,8 +1,14 @@
 from datetime import datetime, timedelta
+import random
+import string
 
 from app.models import Barang, KlaimBarang, Laporan, Notifikasi
 from app.services.encryption.EncryptionService import encryption_service
 from app.services.serah_terima_service import create_serah_terima
+
+
+PICKUP_CODE_PREFIX = "PICKUP:"
+DROPOFF_CODE_PREFIX = "DROPOFF:"
 
 
 class KlaimServiceError(Exception):
@@ -43,7 +49,6 @@ class KlaimDomain:
                 "Klaim hanya bisa dibatalkan dalam 24 jam setelah diajukan"
             )
 
-        self.claim.status_klaim = self.CANCELED
         self.claim.updated_time = now
 
     def verify(self, status_klaim, catatan_admin):
@@ -83,9 +88,34 @@ class KlaimService:
         if not barang:
             raise KlaimServiceError(404, "Barang tidak ditemukan")
 
+        laporan_penemuan = self.db.query(Laporan).filter(
+            Laporan.barang_id == barang_id,
+            Laporan.jenis_laporan == "penemuan"
+        ).first()
+
+        if not laporan_penemuan:
+            raise KlaimServiceError(400, "Barang ini tidak berasal dari laporan penemuan")
+
+        if laporan_penemuan.user_id == user.user_id:
+            raise KlaimServiceError(
+                400,
+                "Pelapor penemuan tidak bisa mengklaim barang yang ia laporkan"
+            )
+
+        if (
+            laporan_penemuan.status_verifikasi != "terverifikasi" or
+            laporan_penemuan.status_laporan != "selesai" or
+            barang.status_barang != "ditemukan"
+        ):
+            raise KlaimServiceError(
+                400,
+                "Barang belum tersedia untuk diklaim"
+            )
+
         duplicate_claim = self.db.query(KlaimBarang).filter(
             KlaimBarang.user_id == user.user_id,
-            KlaimBarang.barang_id == barang_id
+            KlaimBarang.barang_id == barang_id,
+            KlaimBarang.status_klaim.in_(KlaimDomain.active_statuses())
         ).first()
 
         if duplicate_claim:
@@ -132,13 +162,19 @@ class KlaimService:
         if not claim:
             raise KlaimServiceError(404, "Klaim tidak ditemukan")
 
+        barang_id = claim.barang_id
+        laporan_id = claim.laporan_kehilangan_id
+
         KlaimDomain(claim).cancel(datetime.now())
+        self.db.delete(claim)
 
         self.db.commit()
 
         return {
             "message": "Klaim barang berhasil dibatalkan",
             "klaim_id": klaim_id,
+            "barang_id": barang_id,
+            "laporan_id": laporan_id,
             "status_klaim": KlaimDomain.CANCELED
         }
 
@@ -154,10 +190,16 @@ class KlaimService:
             raise KlaimServiceError(404, "Klaim tidak ditemukan")
 
         claim_domain = KlaimDomain(claim)
-        claim_domain.verify(status_klaim, catatan_admin)
+        pickup_code = self._generate_unique_pickup_code() if status_klaim == KlaimDomain.ACCEPTED else None
+        claim_domain.verify(
+            status_klaim,
+            self._build_pickup_note(pickup_code, catatan_admin)
+            if pickup_code
+            else catatan_admin
+        )
 
         if claim_domain.is_accepted():
-            pickup_message = self._accept_claim(claim, admin)
+            pickup_message = self._accept_claim(claim, admin, pickup_code)
         else:
             pickup_message = "Klaim barang Anda ditolak oleh admin."
 
@@ -173,16 +215,83 @@ class KlaimService:
 
         return {
             "message": f"Klaim {status_klaim}",
-            "klaim_id": klaim_id
+            "klaim_id": klaim_id,
+            "pickup_code": pickup_code
         }
 
-    def _accept_claim(self, claim, admin):
+    def verify_pickup_code(self, pickup_code, admin):
+        if admin.role != "admin":
+            raise KlaimServiceError(403, "Bukan admin")
+
+        normalized_code = (pickup_code or "").strip().upper()
+
+        if not normalized_code:
+            raise KlaimServiceError(400, "Kode pickup wajib diisi")
+
+        matched_claim = self._find_claim_by_pickup_code(normalized_code)
+
+        if not matched_claim:
+            return self._verify_dropoff_code(normalized_code)
+
+        barang = self.db.query(Barang).filter(
+            Barang.barang_id == matched_claim.barang_id
+        ).first()
+
+        if not barang:
+            raise KlaimServiceError(404, "Barang tidak ditemukan")
+
+        if barang.status_barang == "selesai":
+            raise KlaimServiceError(400, "Kode pickup sudah pernah diverifikasi")
+
+        barang.status_barang = "selesai"
+        matched_claim.updated_time = datetime.now()
+
+        laporan_kehilangan = self.db.query(Laporan).filter(
+            Laporan.laporan_id == matched_claim.laporan_kehilangan_id
+        ).first()
+        if laporan_kehilangan:
+            laporan_kehilangan.status_laporan = "selesai"
+            barang_kehilangan = self.db.query(Barang).filter(
+                Barang.barang_id == laporan_kehilangan.barang_id
+            ).first()
+            if barang_kehilangan:
+                barang_kehilangan.status_barang = "selesai"
+
+            self._notify_report_completed(
+                laporan_kehilangan,
+                "Laporan kehilangan Anda telah selesai. Barang sudah berhasil diambil."
+            )
+
+        laporan_penemuan = self.db.query(Laporan).filter(
+            Laporan.barang_id == matched_claim.barang_id,
+            Laporan.jenis_laporan == "penemuan"
+        ).first()
+        if laporan_penemuan:
+            laporan_penemuan.status_laporan = "selesai"
+            self._notify_report_completed(
+                laporan_penemuan,
+                "Laporan penemuan Anda telah selesai. Barang sudah dikembalikan kepada pemilik."
+            )
+
+        self.db.commit()
+
+        return {
+            "message": "Kode pickup berhasil diverifikasi",
+            "code_type": "pickup",
+            "pickup_code": normalized_code,
+            "klaim_id": matched_claim.klaim_id,
+            "barang_id": matched_claim.barang_id,
+            "laporan_id": matched_claim.laporan_kehilangan_id,
+            "status_barang": barang.status_barang
+        }
+
+    def _accept_claim(self, claim, admin, pickup_code):
         barang = self.db.query(Barang).filter(
             Barang.barang_id == claim.barang_id
         ).first()
 
         if barang:
-            barang.status_barang = "selesai"
+            barang.status_barang = "diklaim"
             create_serah_terima(
                 db=self.db,
                 klaim=claim,
@@ -190,7 +299,140 @@ class KlaimService:
                 admin=admin
             )
 
+        laporan_kehilangan = self.db.query(Laporan).filter(
+            Laporan.laporan_id == claim.laporan_kehilangan_id
+        ).first()
+        if laporan_kehilangan:
+            laporan_kehilangan.status_laporan = "siap_diambil"
+
         return (
-            "Klaim barang Anda diterima. Ambil barang di Pos Keamanan "
+            f"Klaim barang Anda diterima. Kode pickup Anda: {pickup_code}. "
+            "Tunjukkan kode ini ke admin saat mengambil barang di Pos Keamanan "
             "Asrama IPB, Senin-Jumat 08.00-17.00 WIB."
         )
+
+    def build_dropoff_note(self, dropoff_code, catatan_admin):
+        note = (catatan_admin or "").strip()
+
+        if note:
+            return f"{DROPOFF_CODE_PREFIX}{dropoff_code}|{note}"
+
+        return f"{DROPOFF_CODE_PREFIX}{dropoff_code}"
+
+    def generate_unique_dropoff_code(self):
+        return self._generate_unique_pickup_code()
+
+    def _verify_dropoff_code(self, normalized_code):
+        reports = self.db.query(Laporan).filter(
+            Laporan.jenis_laporan == "penemuan",
+            Laporan.status_verifikasi == "terverifikasi"
+        ).all()
+
+        matched_report = None
+
+        for report in reports:
+            stored_note = encryption_service.decrypt_if_exists(report.catatan_verifikasi)
+            if self._extract_dropoff_code(stored_note) == normalized_code:
+                matched_report = report
+                break
+
+        if not matched_report:
+            raise KlaimServiceError(404, "Kode pickup/dropoff tidak ditemukan")
+
+        if matched_report.status_laporan == "selesai":
+            raise KlaimServiceError(400, "Kode dropoff sudah pernah diverifikasi")
+
+        barang = self.db.query(Barang).filter(
+            Barang.barang_id == matched_report.barang_id
+        ).first()
+
+        matched_report.status_laporan = "selesai"
+        if barang and barang.status_barang != "selesai":
+            barang.status_barang = "ditemukan"
+
+        self._notify_report_completed(
+            matched_report,
+            "Laporan penemuan Anda telah selesai. Barang sudah masuk ke koleksi dan dapat diklaim pemilik."
+        )
+
+        self.db.commit()
+
+        return {
+            "message": "Kode dropoff berhasil diverifikasi",
+            "code_type": "dropoff",
+            "pickup_code": normalized_code,
+            "klaim_id": None,
+            "barang_id": matched_report.barang_id,
+            "laporan_id": matched_report.laporan_id,
+            "status_barang": barang.status_barang if barang else None
+        }
+
+    def _generate_unique_pickup_code(self):
+        alphabet = string.ascii_uppercase + string.digits + "@#$%"
+
+        for _ in range(20):
+            code = "".join(random.choice(alphabet) for _ in range(6))
+            if not self._pickup_code_exists(code):
+                return code
+
+        return "".join(random.choice(alphabet) for _ in range(8))
+
+    def _find_claim_by_pickup_code(self, code):
+        claims = self.db.query(KlaimBarang).filter(
+            KlaimBarang.status_klaim == KlaimDomain.ACCEPTED
+        ).all()
+
+        for claim in claims:
+            stored_note = encryption_service.decrypt_if_exists(claim.catatan_admin)
+            if self._extract_pickup_code(stored_note) == code:
+                return claim
+
+        return None
+
+    def _pickup_code_exists(self, code):
+        if self._find_claim_by_pickup_code(code):
+            return True
+
+        reports = self.db.query(Laporan).filter(
+            Laporan.jenis_laporan == "penemuan"
+        ).all()
+
+        for report in reports:
+            stored_note = encryption_service.decrypt_if_exists(report.catatan_verifikasi)
+            if self._extract_dropoff_code(stored_note) == code:
+                return True
+
+        return False
+
+    def _build_pickup_note(self, pickup_code, catatan_admin):
+        note = (catatan_admin or "").strip()
+
+        if note:
+            return f"{PICKUP_CODE_PREFIX}{pickup_code}|{note}"
+
+        return f"{PICKUP_CODE_PREFIX}{pickup_code}"
+
+    def _extract_pickup_code(self, value):
+        if not value or PICKUP_CODE_PREFIX not in value:
+            return None
+
+        raw_code = value.split(PICKUP_CODE_PREFIX, 1)[1].split("|", 1)[0]
+
+        return raw_code.strip().upper()
+
+    def _extract_dropoff_code(self, value):
+        if not value or DROPOFF_CODE_PREFIX not in value:
+            return None
+
+        raw_code = value.split(DROPOFF_CODE_PREFIX, 1)[1].split("|", 1)[0]
+
+        return raw_code.strip().upper()
+
+    def _notify_report_completed(self, report, message):
+        self.db.add(Notifikasi(
+            user_id=report.user_id,
+            laporan_id=report.laporan_id,
+            pesan=message,
+            tanggal_kirim=datetime.now(),
+            status_baca=False
+        ))

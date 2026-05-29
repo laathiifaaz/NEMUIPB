@@ -17,6 +17,7 @@ class AdminBarangPage extends Component {
       logs: [],
       actionType: "semua",
       sortBy: "newest",
+      searchKeyword: "",
       exportType: "semua",
       showExportMenu: false,
       isLoading: true,
@@ -75,16 +76,39 @@ class AdminBarangPage extends Component {
   };
 
   handleChange = (event) => {
+    this.setState(
+      {
+        [event.target.name]: event.target.value,
+        isLoading: true,
+      },
+      this.loadLogs
+    );
+  };
+
+  handleSearchChange = (event) => {
     this.setState({
-      [event.target.name]: event.target.value,
+      searchKeyword: event.target.value,
     });
   };
 
-  handleFilter = async () => {
-    this.setState({ isLoading: true }, async () => {
-      await this.loadLogs();
-    });
-  };
+  getVisibleLogs(logs) {
+    const keyword = this.state.searchKeyword.trim().toLowerCase();
+
+    if (!keyword) return logs;
+
+    return logs.filter((log) =>
+      [
+        log.item_id,
+        log.item_name,
+        log.action_type,
+        log.administrator,
+        log.note,
+        this.formatTimestamp(log.timestamp),
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(keyword))
+    );
+  }
 
   handleExportTypeChange = (event) => {
     this.setState({
@@ -176,6 +200,17 @@ class AdminBarangPage extends Component {
     return "bg-gray-100 text-gray-600";
   }
 
+  getActionLabel(actionType) {
+    const labels = {
+      verified: "Terverifikasi",
+      rejected: "Ditolak",
+      claim_pending: "Klaim Menunggu",
+      returned: "Dikembalikan",
+    };
+
+    return labels[actionType] || actionType || "-";
+  }
+
   formatTimestamp(timestamp) {
     if (!timestamp) return "-";
 
@@ -187,6 +222,7 @@ class AdminBarangPage extends Component {
 
   render() {
     const { logs, isLoading, error } = this.state;
+    const visibleLogs = this.getVisibleLogs(logs);
 
     return (
       <div className="min-h-screen bg-[#F6F7FB] font-['Plus_Jakarta_Sans'] text-[#002B5B]">
@@ -206,6 +242,7 @@ class AdminBarangPage extends Component {
           >
             <PageHeader
               onToggleSidebar={this.toggleSidebar}
+              navigate={this.props.navigate}
               profileIcon="fa-user-shield"
               actions={
                 <button
@@ -262,7 +299,24 @@ class AdminBarangPage extends Component {
             </section>
 
             <section className="bg-white rounded-[24px] p-6 mb-8 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="lg:col-span-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase">
+                    Cari Aktivitas
+                  </label>
+
+                  <div className="relative mt-2">
+                    <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input
+                      type="text"
+                      value={this.state.searchKeyword}
+                      onChange={this.handleSearchChange}
+                      placeholder="Cari ID barang, nama, aktivitas, admin, atau catatan"
+                      className="w-full bg-gray-100 rounded-xl py-3 pl-12 pr-4 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-[#002B5B]/15"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase">
                     Jenis Aktivitas
@@ -298,15 +352,6 @@ class AdminBarangPage extends Component {
                   </select>
                 </div>
 
-                <div className="flex items-end">
-                  <button
-                    onClick={this.handleFilter}
-                    className="w-full bg-[#002B5B] text-white rounded-xl px-5 py-3 text-sm font-bold hover:bg-[#001f42] transition-all"
-                  >
-                    Terapkan Filter
-                  </button>
-                </div>
-
               </div>
             </section>
 
@@ -334,7 +379,7 @@ class AdminBarangPage extends Component {
                     </thead>
 
                     <tbody>
-                      {logs.map((log) => (
+                      {visibleLogs.map((log) => (
                         <tr
                           key={log.log_id}
                           className="border-b border-gray-50 hover:bg-gray-50"
@@ -353,7 +398,7 @@ class AdminBarangPage extends Component {
                                 log.action_type
                               )}`}
                             >
-                              {log.action_type}
+                              {this.getActionLabel(log.action_type)}
                             </span>
                           </td>
 
@@ -372,11 +417,16 @@ class AdminBarangPage extends Component {
                       ))}
                     </tbody>
                   </table>
+                  {visibleLogs.length === 0 && (
+                    <div className="py-10 text-center text-sm font-semibold text-gray-400">
+                      Tidak ada aktivitas yang cocok dengan pencarian.
+                    </div>
+                  )}
                 </div>
               )}
 
               <div className="flex justify-between items-center mt-8 text-xs text-gray-500">
-                <p>Menampilkan {logs.length} log</p>
+                <p>Menampilkan {visibleLogs.length} dari {logs.length} log</p>
               </div>
             </section>
 

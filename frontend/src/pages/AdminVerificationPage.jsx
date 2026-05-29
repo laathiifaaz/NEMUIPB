@@ -40,6 +40,7 @@ class AdminVerificationPage extends Component {
 
       showApproveModal: false,
       selectedApproveId: null,
+      processingVerification: false,
       handoverDocument: null,
       handoverVerification: null,
       showHandoverModal: false,
@@ -62,6 +63,22 @@ class AdminVerificationPage extends Component {
       window.location.href = "/dashboard";
       return;
     }
+
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    const reportType = params.get("type");
+
+    await new Promise((resolve) =>
+      this.setState(
+        {
+          activeVerificationView: view === "klaim" ? "klaim" : "laporan",
+          selectedReportType: ["kehilangan", "penemuan"].includes(reportType)
+            ? reportType
+            : "semua",
+        },
+        resolve
+      )
+    );
 
     await Promise.all([
       this.fetchReports(),
@@ -176,10 +193,16 @@ class AdminVerificationPage extends Component {
       );
 
       const data = await response.json();
+      const reports = Array.isArray(data) ? data : [];
 
       this.setState({
-        reports: Array.isArray(data) ? data : [],
-        filteredReports: Array.isArray(data) ? data : [],
+        reports,
+        filteredReports: this.getFilteredReports(
+          reports,
+          this.state.search,
+          this.state.selectedFilter,
+          this.state.selectedReportType
+        ),
         currentPage: 1,
         loading: false,
       });
@@ -394,7 +417,7 @@ class AdminVerificationPage extends Component {
   handleClaimVerification = async (claim, statusKlaim) => {
     const isAccepted = statusKlaim === "diterima";
     const catatanAdmin = isAccepted
-      ? "Klaim diterima admin. Dokumen serah terima dan tanda tangan digital dibuat otomatis oleh sistem."
+      ? "Klaim diterima admin. Kode pickup dibuat otomatis oleh sistem."
       : "Klaim ditolak admin.";
 
     try {
@@ -429,7 +452,7 @@ class AdminVerificationPage extends Component {
       this.showPopup(
         isAccepted ? "success" : "error",
         isAccepted
-          ? "Klaim diterima. Dokumen serah terima dan tanda tangan digital berhasil diverifikasi."
+          ? "Klaim diterima. Kode pickup berhasil dibuat untuk user."
           : "Klaim berhasil ditolak"
       );
     } catch (error) {
@@ -547,10 +570,14 @@ class AdminVerificationPage extends Component {
   };
 
   handleApprove = async (id) => {
+    if (this.state.processingVerification) return;
+
     try {
+      this.setState({ processingVerification: true });
+
       const token = localStorage.getItem("access_token");
 
-      await fetch(
+      const response = await fetch(
         `http://127.0.0.1:8000/admin/laporan/${id}/setujui`,
         {
           method: "PATCH",
@@ -563,6 +590,10 @@ class AdminVerificationPage extends Component {
           }),
         }
       );
+
+      if (!response.ok) {
+        throw new Error("Gagal memverifikasi laporan");
+      }
 
       const updated = this.state.reports.map((item) => {
         if (item.laporan_id === id) {
@@ -581,6 +612,7 @@ class AdminVerificationPage extends Component {
       });
 
       this.closeApproveModal();
+      this.closeDetailModal();
 
       this.showPopup(
         "success",
@@ -593,6 +625,8 @@ class AdminVerificationPage extends Component {
         "error",
         "Gagal memverifikasi laporan"
       );
+    } finally {
+      this.setState({ processingVerification: false });
     }
   };
 
@@ -600,7 +634,10 @@ class AdminVerificationPage extends Component {
     const {
       rejectNote,
       selectedReportId,
+      processingVerification,
     } = this.state;
+
+    if (processingVerification) return;
 
     if (!rejectNote.trim()) {
       this.setState({
@@ -612,9 +649,11 @@ class AdminVerificationPage extends Component {
     }
 
     try {
+      this.setState({ processingVerification: true });
+
       const token = localStorage.getItem("access_token");
 
-      await fetch(
+      const response = await fetch(
         `http://127.0.0.1:8000/admin/laporan/${selectedReportId}/tolak`,
         {
           method: "PATCH",
@@ -627,6 +666,10 @@ class AdminVerificationPage extends Component {
           }),
         }
       );
+
+      if (!response.ok) {
+        throw new Error("Gagal menolak laporan");
+      }
 
       const updated = this.state.reports.map((item) => {
         if (item.laporan_id === selectedReportId) {
@@ -646,6 +689,7 @@ class AdminVerificationPage extends Component {
       });
 
       this.closeRejectModal();
+      this.closeDetailModal();
 
       this.showPopup(
         "error",
@@ -658,11 +702,13 @@ class AdminVerificationPage extends Component {
         "error",
         "Gagal menolak laporan"
       );
+    } finally {
+      this.setState({ processingVerification: false });
     }
   };
 
   renderApproveModal() {
-    const { showApproveModal } = this.state;
+    const { showApproveModal, processingVerification } = this.state;
 
     if (!showApproveModal) return null;
 
@@ -695,9 +741,14 @@ class AdminVerificationPage extends Component {
                   this.state.selectedApproveId
                 )
               }
-              className="py-3 rounded-xl bg-[#163A70] text-white text-sm font-bold"
+              disabled={processingVerification}
+              className={`py-3 rounded-xl text-white text-sm font-bold ${
+                processingVerification
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-[#163A70]"
+              }`}
             >
-              Ya, Verifikasi
+              {processingVerification ? "Memproses..." : "Ya, Verifikasi"}
             </button>
           </div>
         </div>
@@ -710,6 +761,7 @@ class AdminVerificationPage extends Component {
       showRejectModal,
       rejectNote,
       errorReject,
+      processingVerification,
     } = this.state;
 
     if (!showRejectModal) return null;
@@ -767,9 +819,14 @@ class AdminVerificationPage extends Component {
 
             <button
               onClick={this.handleReject}
-              className="px-5 py-3 rounded-xl bg-[#D92D20] text-white text-sm font-bold"
+              disabled={processingVerification}
+              className={`px-5 py-3 rounded-xl text-white text-sm font-bold ${
+                processingVerification
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-[#D92D20]"
+              }`}
             >
-              Tolak Laporan
+              {processingVerification ? "Memproses..." : "Tolak Laporan"}
             </button>
           </div>
         </div>
@@ -909,6 +966,7 @@ class AdminVerificationPage extends Component {
     const {
       selectedReport,
       showDetailModal,
+      processingVerification,
     } = this.state;
 
     if (!showDetailModal || !selectedReport)
@@ -917,6 +975,7 @@ class AdminVerificationPage extends Component {
     const isDisabled =
       selectedReport.status_verifikasi !==
       "belum_diverifikasi";
+    const actionDisabled = isDisabled || processingVerification;
     const reportType = this.getReportTypeMeta(selectedReport.jenis_laporan);
     const reportDateLabel =
       selectedReport.jenis_laporan === "penemuan"
@@ -932,19 +991,19 @@ class AdminVerificationPage extends Component {
     const imageSrc = this.getImageSrc(selectedReport.dokumentasi);
 
     return (
-      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-6">
-        <div className="bg-white rounded-[32px] w-full max-w-[1060px] relative max-h-[92vh] overflow-hidden shadow-2xl">
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-4">
+        <div className="bg-white rounded-[24px] w-full max-w-[940px] relative max-h-[calc(100vh-32px)] overflow-hidden shadow-2xl">
           <button
             type="button"
             onClick={this.closeDetailModal}
-            className="absolute top-3 right-6 z-20 text-gray-400 hover:text-gray-600 text-xl transition-colors"
+            className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white/95 border border-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm"
             aria-label="Tutup detail laporan"
           >
             x
           </button>
 
-          <div className="flex flex-col md:flex-row max-h-[92vh] overflow-y-auto">
-            <div className="w-full md:w-[38%] bg-gray-50 flex items-center justify-center overflow-hidden min-h-[260px] md:min-h-[620px]">
+          <div className="flex flex-col md:flex-row max-h-[calc(100vh-32px)] overflow-hidden">
+            <div className="w-full md:w-[34%] bg-gray-50 flex items-center justify-center overflow-hidden h-52 md:h-auto">
               <button
                 type="button"
                 onClick={this.openImagePreview}
@@ -963,14 +1022,14 @@ class AdminVerificationPage extends Component {
               </button>
             </div>
 
-            <div className="flex-1 p-8 md:p-12 flex flex-col gap-6">
-              <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start mb-4">
+            <div className="flex-1 p-5 pr-14 md:p-7 md:pr-16 flex flex-col gap-3 min-w-0">
+              <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-start">
                 <div>
                   <p className="text-[#9A7D0A] text-xs font-black uppercase tracking-widest">
                     {selectedReport.kategori || "Kategori"}
                   </p>
 
-                  <h2 className="text-3xl font-extrabold text-[#002B5B]">
+                  <h2 className="text-2xl font-extrabold text-[#002B5B] leading-tight">
                     {selectedReport.nama_barang}
                   </h2>
                 </div>
@@ -986,35 +1045,35 @@ class AdminVerificationPage extends Component {
                 </div>
               </div>
 
-              <p className="text-gray-500 text-sm leading-relaxed mb-6">
+              <p className="text-gray-500 text-sm leading-relaxed">
                 {selectedReport.deskripsi || "Tidak ada deskripsi."}
               </p>
 
-              <div className="flex flex-wrap gap-4 mb-8">
-                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+              <div className="flex flex-wrap gap-2">
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700">
                   <i className="fas fa-map-marker-alt mr-2 text-[#002B5B]"></i>
                   {selectedReport.lokasi || "-"}
                 </div>
 
-                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700">
                   <i className="fas fa-user mr-2 text-[#002B5B]"></i>
                   {selectedReport.pelapor || "-"}
                 </div>
 
-                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700">
                   <i className="fas fa-envelope mr-2 text-[#002B5B]"></i>
                   {selectedReport.email || "-"}
                 </div>
 
-                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700 capitalize">
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700 capitalize">
                   <i className="fas fa-clipboard-list mr-2 text-[#002B5B]"></i>
                   {selectedReport.jenis_laporan || "-"}
                 </div>
               </div>
 
-              <div className="mb-8 bg-[#F8FAFC] border border-[#E7ECF3] rounded-2xl p-4">
-                <div className="flex flex-wrap gap-3">
-                  <div className="bg-white border border-[#E7ECF3] px-4 py-3 rounded-xl">
+              <div className="bg-[#F8FAFC] border border-[#E7ECF3] rounded-2xl p-3">
+                <div className="flex flex-wrap gap-2">
+                  <div className="bg-white border border-[#E7ECF3] px-3 py-2 rounded-xl">
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
                       Jenis Laporan
                     </p>
@@ -1024,7 +1083,7 @@ class AdminVerificationPage extends Component {
                     </span>
                   </div>
 
-                  <div className="bg-white border border-[#E7ECF3] px-4 py-3 rounded-xl">
+                  <div className="bg-white border border-[#E7ECF3] px-3 py-2 rounded-xl">
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
                       {reportDateLabel}
                     </p>
@@ -1033,7 +1092,7 @@ class AdminVerificationPage extends Component {
                     </p>
                   </div>
 
-                  <div className="bg-white border border-[#E7ECF3] px-4 py-3 rounded-xl">
+                  <div className="bg-white border border-[#E7ECF3] px-3 py-2 rounded-xl">
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
                       Tanggal Dilaporkan
                     </p>
@@ -1045,7 +1104,7 @@ class AdminVerificationPage extends Component {
               </div>
 
               {selectedReport.catatan_verifikasi && (
-                <div className="mb-8 bg-[#FFF7F7] border border-red-100 rounded-2xl p-4">
+                <div className="bg-[#FFF7F7] border border-red-100 rounded-2xl p-3">
                   <p className="text-xs font-bold text-red-500 mb-1">
                     Catatan Verifikasi
                   </p>
@@ -1056,21 +1115,21 @@ class AdminVerificationPage extends Component {
                 </div>
               )}
 
-              <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center border-t border-gray-50 pt-6 mt-auto">
+              <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center border-t border-gray-50 pt-4 mt-auto">
                 <p className="text-xs text-gray-400 font-bold">
                   ID: #IPB-{selectedReport.laporan_id}
                 </p>
 
                 <div className="flex gap-3">
                   <button
-                    disabled={isDisabled}
+                    disabled={actionDisabled}
                     onClick={() =>
                       this.openApproveModal(
                         selectedReport.laporan_id
                       )
                     }
                     className={`px-6 py-3 rounded-lg text-xs font-bold ${
-                      isDisabled
+                      actionDisabled
                         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                         : "bg-[#002B5B] text-white"
                     }`}
@@ -1079,14 +1138,14 @@ class AdminVerificationPage extends Component {
                   </button>
 
                   <button
-                    disabled={isDisabled}
+                    disabled={actionDisabled}
                     onClick={() =>
                       this.openRejectModal(
                         selectedReport.laporan_id
                       )
                     }
                     className={`px-6 py-3 rounded-lg text-xs font-bold ${
-                      isDisabled
+                      actionDisabled
                         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                         : "bg-[#C9181F] text-white"
                     }`}
@@ -1191,6 +1250,7 @@ class AdminVerificationPage extends Component {
           >
             <PageHeader
               onToggleSidebar={this.toggleSidebar}
+              navigate={this.props.navigate}
               profileIcon="fa-user-shield"
               actions={
                 <button
@@ -1336,7 +1396,7 @@ class AdminVerificationPage extends Component {
                     Verifikasi Klaim Barang
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Saat klaim diterima, sistem membuat dokumen serah terima beserta tanda tangan digital, lalu status barang otomatis menjadi <span className="font-bold">selesai</span>.
+                    Saat klaim diterima, sistem membuat kode pickup untuk user. Barang selesai dikembalikan setelah admin memverifikasi kode pickup di dashboard.
                   </p>
                 </div>
 

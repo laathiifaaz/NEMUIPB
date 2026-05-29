@@ -22,6 +22,7 @@ class App extends Component {
     this.state = {
       isLoggedIn: AuthService.isLoggedIn(),
       currentPath: window.location.pathname,
+      currentSearch: window.location.search,
       sessionExpired: false,
       sessionMessage: "",
     };
@@ -59,6 +60,7 @@ class App extends Component {
     this.setState({
       isLoggedIn: true,
       currentPath: "/dashboard",
+      currentSearch: "",
     });
 
     window.history.pushState({}, "", "/dashboard");
@@ -70,6 +72,7 @@ class App extends Component {
     this.setState({
       isLoggedIn: false,
       currentPath: "/login",
+      currentSearch: "",
       sessionExpired: false,
       sessionMessage: "",
     });
@@ -83,6 +86,7 @@ class App extends Component {
     this.setState({
       isLoggedIn: false,
       currentPath: "/login",
+      currentSearch: "",
       sessionExpired: true,
       sessionMessage:
         event.detail ||
@@ -96,12 +100,13 @@ class App extends Component {
     window.history.pushState({}, "", path);
 
     this.setState({
-      currentPath: path,
+      currentPath: window.location.pathname,
+      currentSearch: window.location.search,
     });
   };
 
   renderPage() {
-    const { isLoggedIn, currentPath } = this.state;
+    const { isLoggedIn, currentPath, currentSearch } = this.state;
     const user = AuthService.getCurrentUser();
 
     if (!isLoggedIn) {
@@ -145,6 +150,7 @@ class App extends Component {
     if (currentPath === "/verifikasi") {
       return (
         <VerificationReportPage
+          key={`verifikasi${currentSearch}`}
           navigate={this.navigate}
           handleLogout={this.handleLogout}
         />
@@ -190,7 +196,12 @@ class App extends Component {
         return <DashboardPage navigate={this.navigate} />;
       }
 
-      return <AdminVerificationPage navigate={this.navigate} />;
+      return (
+        <AdminVerificationPage
+          key={`admin-verifikasi${currentSearch}`}
+          navigate={this.navigate}
+        />
+      );
     }
 
     // Admin analytics

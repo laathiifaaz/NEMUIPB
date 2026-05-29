@@ -22,6 +22,7 @@ class ClaimBarangPage extends Component {
       submitting: false,
       error: null,
       successMessage: "",
+      submittedClaim: null,
     };
   }
 
@@ -76,6 +77,7 @@ class ClaimBarangPage extends Component {
       loading: true,
       error: null,
       successMessage: "",
+      submittedClaim: null,
     });
 
     try {
@@ -93,20 +95,61 @@ class ClaimBarangPage extends Component {
         throw new Error("Barang tidak ditemukan.");
       }
 
+      const currentUser = AuthService.getCurrentUser();
+      const currentUserId = currentUser?.user_id || currentUser?.id;
+      if (
+        barang.jenis_laporan === "penemuan" &&
+        barang.pelapor_user_id &&
+        currentUserId &&
+        String(barang.pelapor_user_id) === String(currentUserId)
+      ) {
+        throw new Error("Kamu tidak bisa mengklaim barang yang kamu laporkan sebagai penemuan.");
+      }
+
+      if (
+        barang.jenis_laporan !== "penemuan" ||
+        barang.status_laporan !== "selesai" ||
+        barang.status_verifikasi !== "terverifikasi" ||
+        barang.status_barang !== "ditemukan"
+      ) {
+        throw new Error("Barang ini belum tersedia untuk diklaim.");
+      }
+
       const availableReports = (Array.isArray(reports) ? reports : []).filter(
         (report) =>
           report.jenis_laporan === "kehilangan" &&
           report.status_laporan === "disetujui" &&
           report.status_verifikasi === "terverifikasi"
       );
+      const storedClaims = JSON.parse(
+        localStorage.getItem("nemuipb_claim_status") || "{}"
+      );
+      const submittedClaimEntry = Object.entries(storedClaims).find(
+        ([, claim]) =>
+          String(claim?.barang_id) === String(barangId) &&
+          claim?.status_klaim !== "dibatalkan"
+      );
+      const submittedClaim = submittedClaimEntry
+        ? {
+            laporan_id:
+              submittedClaimEntry[1].laporan_id || submittedClaimEntry[0],
+            ...submittedClaimEntry[1],
+          }
+        : null;
 
       this.setState({
         barang,
         reports: availableReports,
         selectedReportId:
-          availableReports.length > 0
+          submittedClaim?.laporan_id
+            ? String(submittedClaim.laporan_id)
+            : availableReports.length > 0
             ? String(availableReports[0].laporan_id)
             : "",
+        submittedClaim,
+        successMessage: submittedClaim
+          ? "Klaim barang berhasil diajukan"
+          : "",
         loading: false,
       });
     } catch (error) {
@@ -114,6 +157,7 @@ class ClaimBarangPage extends Component {
         barang: null,
         reports: [],
         selectedReportId: "",
+        submittedClaim: null,
         loading: false,
         error: error.message || "Gagal memuat data klaim.",
       });
@@ -121,8 +165,12 @@ class ClaimBarangPage extends Component {
   };
 
   handleSubmitClaim = async () => {
-    const { selectedReportId } = this.state;
+    const { selectedReportId, submittedClaim } = this.state;
     const barangId = this.getBarangId();
+
+    if (submittedClaim) {
+      return;
+    }
 
     if (!selectedReportId) {
       this.setState({
@@ -148,6 +196,7 @@ class ClaimBarangPage extends Component {
       );
       storedClaims[selectedReportId] = {
         barang_id: barangId,
+        laporan_id: selectedReportId,
         klaim_id: result.klaim_id,
         status_klaim: result.status_klaim || "diproses",
         updated_at: new Date().toISOString(),
@@ -159,9 +208,8 @@ class ClaimBarangPage extends Component {
 
       this.setState({
         submitting: false,
-        successMessage:
-          result.message ||
-          "Klaim berhasil diajukan dan menunggu verifikasi admin.",
+        submittedClaim: storedClaims[selectedReportId],
+        successMessage: "Klaim barang berhasil diajukan",
       });
     } catch (error) {
       this.setState({
@@ -173,11 +221,13 @@ class ClaimBarangPage extends Component {
 
   renderReportCard(report) {
     const selected = String(this.state.selectedReportId) === String(report.laporan_id);
+    const claimLocked = Boolean(this.state.submittedClaim);
 
     return (
       <button
         key={report.laporan_id}
         type="button"
+        disabled={claimLocked}
         onClick={() =>
           this.setState({
             selectedReportId: String(report.laporan_id),
@@ -189,7 +239,7 @@ class ClaimBarangPage extends Component {
           selected
             ? "border-[#002B5B] shadow-md shadow-blue-900/10"
             : "border-gray-100 hover:border-[#A2B4C7]"
-        }`}
+        } ${claimLocked ? "cursor-not-allowed opacity-75" : ""}`}
       >
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
@@ -233,6 +283,15 @@ class ClaimBarangPage extends Component {
     );
   }
 
+  goToClaimStatus = () => {
+    const laporanId =
+      this.state.submittedClaim?.laporan_id || this.state.selectedReportId;
+
+    if (!laporanId) return;
+
+    this.props.navigate(`/verifikasi?laporan=${laporanId}`);
+  };
+
   render() {
     const {
       user,
@@ -244,7 +303,9 @@ class ClaimBarangPage extends Component {
       submitting,
       error,
       successMessage,
+      submittedClaim,
     } = this.state;
+    const claimLocked = Boolean(submittedClaim);
 
     return (
       <UserPageLayout
@@ -355,8 +416,15 @@ class ClaimBarangPage extends Component {
                 )}
 
                 {successMessage && (
-                  <div className="bg-blue-50 text-[#1D4ED8] rounded-2xl px-4 py-3 text-sm font-bold mb-5">
-                    {successMessage}
+                  <div className="bg-blue-50 text-[#1D4ED8] rounded-2xl px-4 py-3 text-sm font-bold mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <span>{successMessage}</span>
+                    <button
+                      type="button"
+                      onClick={this.goToClaimStatus}
+                      className="bg-white text-[#002B5B] border border-blue-100 px-4 py-2 rounded-xl text-xs font-black hover:bg-blue-50 transition-colors"
+                    >
+                      Lihat Status Klaim
+                    </button>
                   </div>
                 )}
 
@@ -378,10 +446,19 @@ class ClaimBarangPage extends Component {
                   <button
                     type="button"
                     onClick={this.handleSubmitClaim}
-                    disabled={submitting || !selectedReportId || reports.length === 0}
+                    disabled={
+                      claimLocked ||
+                      submitting ||
+                      !selectedReportId ||
+                      reports.length === 0
+                    }
                     className="bg-[#002B5B] hover:bg-[#001F42] disabled:bg-gray-300 text-white px-7 py-3.5 rounded-xl text-sm font-black transition-colors"
                   >
-                    {submitting ? "Mengajukan..." : "Kirim Klaim"}
+                    {claimLocked
+                      ? "Klaim Sudah Diajukan"
+                      : submitting
+                      ? "Mengajukan..."
+                      : "Kirim Klaim"}
                   </button>
                 </div>
               </section>

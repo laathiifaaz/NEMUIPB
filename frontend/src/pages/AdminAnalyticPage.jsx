@@ -4,6 +4,7 @@ import AdminService from "../services/AdminService";
 import AdminSidebar from "../components/admin/AdminSidebar";
 import PageHeader from "../components/PageHeader";
 import PageFooter from "../components/PageFooter";
+import ReportTrendChart from "../components/admin/ReportTrendChart";
 import {
   getStoredSidebarExpanded,
   setStoredSidebarExpanded,
@@ -121,42 +122,7 @@ class AdminAnalyticsPage extends Component {
   };
 
   renderMonthlyTrendsChart() {
-    const { monthlyTrends } = this.state;
-    const maxVal = Math.max(...monthlyTrends.map(d => Math.max(d.reported, d.returned)), 1);
-
-    return (
-      <div className="h-72 flex items-end gap-6 pt-6 px-2 relative border-b border-gray-100">
-        {/* Garis Grid Horizontal Statis */}
-        <div className="absolute inset-x-0 top-1/4 border-t border-gray-100 pointer-events-none"></div>
-        <div className="absolute inset-x-0 top-2/4 border-t border-gray-100 pointer-events-none"></div>
-        <div className="absolute inset-x-0 top-3/4 border-t border-gray-100 pointer-events-none"></div>
-
-        {monthlyTrends.map((data, idx) => {
-          const reportedHeight = (data.reported / maxVal) * 100;
-          const returnedHeight = (data.returned / maxVal) * 100;
-
-          return (
-            <div key={idx} className="flex-1 flex flex-col items-center z-10">
-              <div className="w-full flex items-end gap-1.5 h-56">
-                {/* Bar Terlaporkan (Reported) */}
-                <div 
-                  className="w-full bg-[#A2B4C7] rounded-t-sm transition-all duration-500 hover:opacity-90"
-                  style={{ height: `${reportedHeight}%` }}
-                  title={`Dilaporkan: ${data.reported}`}
-                ></div>
-                {/* Bar Dikembalikan (Returned) */}
-                <div 
-                  className="w-full bg-[#8E793E] rounded-t-sm transition-all duration-500 hover:opacity-90"
-                  style={{ height: `${returnedHeight}%` }}
-                  title={`Ditemukan: ${data.returned}`}
-                ></div>
-              </div>
-              <p className="text-[11px] font-bold text-gray-400 mt-3 tracking-wider">{data.month}</p>
-            </div>
-          );
-        })}
-      </div>
-    );
+    return <ReportTrendChart data={this.state.monthlyTrends} heightClass="h-72" />;
   }
 
   render() {
@@ -186,6 +152,7 @@ class AdminAnalyticsPage extends Component {
           >
             <PageHeader
               onToggleSidebar={this.toggleSidebar}
+              navigate={this.props.navigate}
               profileIcon="fa-user-shield"
               actions={
                 <div className="flex gap-3">

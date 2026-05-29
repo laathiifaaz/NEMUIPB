@@ -46,18 +46,9 @@ class DashboardPage extends Component {
 
       const data = await BarangService.getAllBarang();
       const items = Array.isArray(data) ? data : [];
-      const verifiedItems = items.filter(
-        (item) =>
-          item.status_verifikasi === "terverifikasi" &&
-          item.status_laporan === "disetujui"
-      );
+      const verifiedItems = this.getVisibleUserItems(items);
 
       const sortedItems = verifiedItems
-        .filter(
-          (item) =>
-            item.jenis_laporan === "penemuan" &&
-            item.status_barang === "ditemukan"
-        )
         .sort(
           (a, b) =>
             Number(b.laporan_id || b.barang_id || 0) -
@@ -94,18 +85,9 @@ class DashboardPage extends Component {
     try {
       const data = await BarangService.getAllBarang();
       const items = Array.isArray(data) ? data : [];
-      const verifiedItems = items.filter(
-        (item) =>
-          item.status_verifikasi === "terverifikasi" &&
-          item.status_laporan === "disetujui"
-      );
+      const verifiedItems = this.getVisibleUserItems(items);
 
       const sortedItems = [...verifiedItems]
-        .filter(
-          (item) =>
-            item.jenis_laporan === "penemuan" &&
-            item.status_barang === "ditemukan"
-        )
         .sort((a, b) => {
           return (
             Number(b.laporan_id || b.barang_id || 0) -
@@ -143,6 +125,26 @@ class DashboardPage extends Component {
     });
   };
 
+  getVisibleUserItems(items) {
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      const allowedStatus = ["hilang", "ditemukan", "selesai"].includes(
+        item.status_barang
+      );
+
+      if (!allowedStatus || item.status_verifikasi !== "terverifikasi") {
+        return false;
+      }
+
+      if (item.jenis_laporan === "penemuan") {
+        return item.status_laporan === "selesai";
+      }
+
+      return ["disetujui", "siap_diambil", "selesai"].includes(
+        item.status_laporan
+      );
+    });
+  }
+
   getItemImage(item) {
     const value = item?.foto_url || item?.dokumentasi || "";
 
@@ -173,7 +175,7 @@ class DashboardPage extends Component {
       <section className="mb-16">
         <div className="flex justify-between items-center mb-8">
           <h3 className="text-2xl font-bold text-[#002B5B]">
-            Penemuan Terbaru
+            Barang Terbaru
           </h3>
 
           <button
@@ -217,7 +219,13 @@ class DashboardPage extends Component {
                     className={`
                       absolute top-4 left-4 px-3 py-1 rounded-full
                       text-[9px] font-black uppercase text-white
-                      ${item.status_barang === "hilang" ? "bg-blue-500" : "bg-cyan-600"}
+                      ${
+                        item.status_barang === "hilang"
+                          ? "bg-blue-500"
+                          : item.status_barang === "ditemukan"
+                          ? "bg-cyan-600"
+                          : "bg-yellow-500"
+                      }
                     `}
                   >
                     {item.status_barang}
@@ -245,7 +253,9 @@ class DashboardPage extends Component {
                     <span>
                       {item.status_barang === "hilang"
                         ? "Hilang"
-                        : "Ditemukan"}
+                        : item.status_barang === "ditemukan"
+                        ? "Ditemukan"
+                        : "Selesai"}
                       : {item.tanggal_kejadian}
                     </span>
                   </div>
@@ -271,13 +281,6 @@ class DashboardPage extends Component {
             ))
           )}
 
-          {this.state.isModalOpen && (
-            <ModalDetail
-              data={this.state.selectedBarang}
-              onClose={this.closeModal}
-              navigate={this.props.navigate}
-            />
-          )}
         </div>
       </section>
     );
@@ -363,6 +366,7 @@ class DashboardPage extends Component {
   } = this.state;
 
     return (
+      <>
       <UserPageLayout
         currentPath="/dashboard"
         isSidebarExpanded={isSidebarExpanded}
@@ -514,6 +518,16 @@ class DashboardPage extends Component {
 
           {this.renderPickupLocation()}
       </UserPageLayout>
+
+      {this.state.isModalOpen && (
+        <ModalDetail
+          data={this.state.selectedBarang}
+          onClose={this.closeModal}
+          navigate={this.props.navigate}
+          compact
+        />
+      )}
+      </>
     );
   }
 }

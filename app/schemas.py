@@ -74,3 +74,6 @@ class KlaimCreate(BaseModel):
 class VerifikasiKlaim(BaseModel):
     status_klaim: str
     catatan_admin: str | None = None
+
+class VerifikasiPickup(BaseModel):
+    pickup_code: str

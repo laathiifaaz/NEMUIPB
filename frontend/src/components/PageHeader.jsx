@@ -67,32 +67,90 @@ const getUserNotificationDescription = (notification) => {
     .join(" ");
 };
 
+const isNotificationUnread = (notification, isAdmin) => {
+  if (isAdmin || notification.synthetic) {
+    return (notification.count || 0) > 0 && !notification.readLocally;
+  }
+
+  return !notification.status_baca;
+};
+
+const getStoredNotificationScope = () => {
+  if (typeof window === "undefined") return "admin";
+
+  return sessionStorage.getItem("nemuipb_notification_scope") || "admin";
+};
+
 const NotificationBell = ({ navigate }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [adminNotifications, setAdminNotifications] = useState([]);
+  const [userNotifications, setUserNotifications] = useState([]);
+  const [activeNotificationScope, setActiveNotificationScope] = useState(
+    getStoredNotificationScope
+  );
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef(null);
   const currentUser = AuthService.getCurrentUser();
   const isAdmin = currentUser?.role === "admin";
 
   const unreadCount = useMemo(
-    () =>
-      isAdmin
-        ? notifications.reduce((total, item) => total + (item.count || 0), 0)
-        : notifications.filter((item) => !item.status_baca).length,
-    [notifications, isAdmin]
+    () => {
+      const adminUnread = isAdmin
+        ? adminNotifications.reduce(
+            (total, item) =>
+              total + (isNotificationUnread(item, true) ? item.count || 0 : 0),
+            0
+          )
+        : 0;
+      const userUnread = userNotifications.filter((item) => !item.status_baca).length;
+
+      return adminUnread + userUnread;
+    },
+    [adminNotifications, userNotifications, isAdmin]
   );
+
+  const displayingAdminNotifications = isAdmin && activeNotificationScope === "admin";
+  const displayedNotifications = displayingAdminNotifications
+    ? adminNotifications
+    : userNotifications;
+  const displayedUnreadCount = displayingAdminNotifications
+    ? adminNotifications.reduce(
+        (total, item) =>
+          total + (isNotificationUnread(item, true) ? item.count || 0 : 0),
+        0
+      )
+    : userNotifications.filter((item) => !item.status_baca).length;
+  const adminPendingCount = adminNotifications.reduce(
+    (total, item) => total + (item.count || 0),
+    0
+  );
+  const userUnreadCount = userNotifications.filter((item) => !item.status_baca)
+    .length;
+
+  const changeNotificationScope = (scope) => {
+    setActiveNotificationScope(scope);
+    sessionStorage.setItem("nemuipb_notification_scope", scope);
+  };
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchNotifications = async () => {
       try {
-        if (isAdmin) {
-          const [reportsData, claimsData] = await Promise.all([
-            AdminService.getAllReports(),
-            AdminService.getPendingClaims(),
-          ]);
+        const adminDataPromise = isAdmin
+          ? Promise.all([
+              AdminService.getAllReports(),
+              AdminService.getPendingClaims(),
+            ])
+          : Promise.resolve(null);
+        const userDataPromise = NotifikasiService.getNotifikasi();
+        const [adminData, data] = await Promise.all([
+          adminDataPromise,
+          userDataPromise,
+        ]);
+
+        if (isAdmin && adminData) {
+          const [reportsData, claimsData] = adminData;
 
           const pendingReports = (Array.isArray(reportsData) ? reportsData : [])
             .filter((report) => report.status_verifikasi === "belum_diverifikasi");
@@ -112,7 +170,7 @@ const NotificationBell = ({ navigate }) => {
               title: "Laporan kehilangan baru",
               message: `${lostCount} laporan kehilangan menunggu verifikasi`,
               icon: "fa-search-minus",
-              path: "/admin/verifikasi",
+              path: "/admin/verifikasi?view=laporan&type=kehilangan",
             },
             {
               id: "admin-found",
@@ -121,7 +179,7 @@ const NotificationBell = ({ navigate }) => {
               title: "Laporan penemuan baru",
               message: `${foundCount} laporan penemuan menunggu verifikasi`,
               icon: "fa-search-plus",
-              path: "/admin/verifikasi",
+              path: "/admin/verifikasi?view=laporan&type=penemuan",
             },
             {
               id: "admin-claims",
@@ -130,19 +188,17 @@ const NotificationBell = ({ navigate }) => {
               title: "Klaim barang baru",
               message: `${pendingClaims.length} klaim barang menunggu verifikasi`,
               icon: "fa-handshake",
-              path: "/admin/verifikasi",
+              path: "/admin/verifikasi?view=klaim",
             },
           ];
 
           if (isMounted) {
-            setNotifications(adminNotifications);
-            setLoading(false);
+            setAdminNotifications(
+              adminNotifications.filter((notification) => notification.count > 0)
+            );
           }
-
-          return;
         }
 
-        const data = await NotifikasiService.getNotifikasi();
         const enrichedNotifications = await Promise.all(
           (Array.isArray(data) ? data : []).map(async (notification) => {
             if (!notification.laporan_id) return notification;
@@ -163,12 +219,13 @@ const NotificationBell = ({ navigate }) => {
         );
 
         if (isMounted) {
-          setNotifications(enrichedNotifications);
+          setUserNotifications(enrichedNotifications);
           setLoading(false);
         }
       } catch (error) {
         if (isMounted) {
-          setNotifications([]);
+          setAdminNotifications([]);
+          setUserNotifications([]);
           setLoading(false);
         }
       }
@@ -202,6 +259,14 @@ const NotificationBell = ({ navigate }) => {
 
   const handleRead = async (notification) => {
     if (notification.synthetic) {
+      setAdminNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id
+            ? { ...item, readLocally: true }
+            : item
+        )
+      );
+
       if (notification.path && navigate) {
         navigate(notification.path);
         setIsOpen(false);
@@ -211,7 +276,7 @@ const NotificationBell = ({ navigate }) => {
     }
 
     if (!notification.status_baca) {
-      setNotifications((current) =>
+      setUserNotifications((current) =>
         current.map((item) =>
           item.notifikasi_id === notification.notifikasi_id
             ? { ...item, status_baca: true }
@@ -222,7 +287,7 @@ const NotificationBell = ({ navigate }) => {
       try {
         await NotifikasiService.markAsRead(notification.notifikasi_id);
       } catch (error) {
-        setNotifications((current) =>
+        setUserNotifications((current) =>
           current.map((item) =>
             item.notifikasi_id === notification.notifikasi_id
               ? { ...item, status_baca: false }
@@ -263,40 +328,74 @@ const NotificationBell = ({ navigate }) => {
                 Notifikasi
               </h2>
               <p className="text-[11px] text-gray-400">
-                {unreadCount} belum dibaca
+                {displayedUnreadCount} belum dibaca
               </p>
             </div>
 
             <i className="fas fa-inbox text-blue-500 text-sm"></i>
           </div>
 
+          {isAdmin && (
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="grid grid-cols-2 gap-2 bg-[#F8FAFC] rounded-xl p-1">
+                {[
+                  { value: "admin", label: "Admin" },
+                  { value: "user", label: "User" },
+                ].map((option) => {
+                  const hasPending =
+                    option.value === "admin"
+                      ? adminPendingCount > 0
+                      : userUnreadCount > 0;
+
+                  return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => changeNotificationScope(option.value)}
+                    className={`relative py-2 rounded-lg text-xs font-black transition-colors ${
+                      activeNotificationScope === option.value
+                        ? "bg-[#002B5B] text-white"
+                        : "text-[#002B5B] hover:bg-white"
+                    }`}
+                  >
+                    {option.label}
+                    {hasPending && (
+                      <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-[#2563EB]"></span>
+                    )}
+                  </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
               <div className="px-5 py-8 text-center text-sm text-gray-400">
                 Memuat notifikasi...
               </div>
-            ) : notifications.length === 0 ? (
+            ) : displayedNotifications.length === 0 ? (
               <div className="px-5 py-8 text-center text-sm text-gray-400">
                 Belum ada notifikasi.
               </div>
             ) : (
-              notifications.map((notification) => (
+              displayedNotifications.map((notification) => (
                 <button
                   key={notification.notifikasi_id || notification.id}
                   type="button"
                   onClick={() => handleRead(notification)}
                   className={`w-full text-left px-5 py-4 border-b border-gray-50 last:border-b-0 hover:bg-blue-50/70 transition-colors ${
-                    notification.status_baca || notification.synthetic
-                      ? "bg-white"
-                      : "bg-blue-50/60"
+                    isNotificationUnread(notification, displayingAdminNotifications)
+                      ? "bg-blue-50/60"
+                      : "bg-white"
                   }`}
                 >
                   <div className="flex gap-3">
                     <span
                       className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
-                        notification.status_baca
-                          ? "bg-gray-200"
-                          : "bg-[#2563EB]"
+                        isNotificationUnread(notification, displayingAdminNotifications)
+                          ? "bg-[#2563EB]"
+                          : "bg-gray-200"
                       }`}
                     ></span>
 

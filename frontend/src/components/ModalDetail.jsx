@@ -1,14 +1,22 @@
 import React, { useState } from "react";
+import AuthService from "../services/AuthService";
 
-const ModalDetail = ({ data, onClose, navigate }) => {
+const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
 
+  const currentUser = AuthService.getCurrentUser();
+  const currentUserId = currentUser?.user_id || currentUser?.id;
   const barangId = data?.barang_id || data?.id;
+  const isOwnFindingReport =
+    currentUserId &&
+    data?.pelapor_user_id &&
+    String(currentUserId) === String(data.pelapor_user_id);
   const canClaim =
     data?.status_barang === "ditemukan" &&
     data?.jenis_laporan === "penemuan" &&
-    data?.status_laporan === "disetujui" &&
-    data?.status_verifikasi === "terverifikasi";
+    data?.status_laporan === "selesai" &&
+    data?.status_verifikasi === "terverifikasi" &&
+    !isOwnFindingReport;
 
   if (!data) return null;
 
@@ -56,11 +64,17 @@ const ModalDetail = ({ data, onClose, navigate }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/45 flex justify-center items-center z-[9999] p-5 font-['Plus_Jakarta_Sans']"
+      className={`fixed inset-0 bg-black/45 flex justify-center items-center z-[9999] font-['Plus_Jakarta_Sans'] ${
+        compact ? "p-4" : "p-5"
+      }`}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[1060px] max-h-[92vh] bg-white rounded-[32px] overflow-hidden relative shadow-2xl transition-all"
+        className={`w-full bg-white overflow-hidden relative shadow-2xl transition-all ${
+          compact
+            ? "max-w-[940px] max-h-[calc(100vh-32px)] rounded-[24px]"
+            : "max-w-[1060px] max-h-[92vh] rounded-[32px]"
+        }`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="absolute top-4 left-6 z-10 hidden sm:block">
@@ -70,14 +84,24 @@ const ModalDetail = ({ data, onClose, navigate }) => {
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3 right-6 text-gray-400 hover:text-gray-600 text-xl transition-colors z-20"
+          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white/95 border border-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-600 text-xl transition-colors shadow-sm"
           aria-label="Tutup detail barang"
         >
           x
         </button>
 
-        <div className="flex flex-col md:flex-row max-h-[92vh] overflow-y-auto">
-          <div className="w-full md:w-[38%] bg-gray-50 flex items-center justify-center overflow-hidden min-h-[260px] md:min-h-[620px]">
+        <div
+          className={`flex flex-col md:flex-row overflow-hidden ${
+            compact ? "max-h-[calc(100vh-32px)]" : "max-h-[92vh] overflow-y-auto"
+          }`}
+        >
+          <div
+            className={`w-full bg-gray-50 flex items-center justify-center overflow-hidden ${
+              compact
+                ? "md:w-[34%] h-52 md:h-auto"
+                : "md:w-[38%] min-h-[260px] md:min-h-[620px]"
+            }`}
+          >
             <button
               type="button"
               onClick={() => setIsImagePreviewOpen(true)}
@@ -92,13 +116,23 @@ const ModalDetail = ({ data, onClose, navigate }) => {
             </button>
           </div>
 
-          <div className="flex-1 p-8 md:p-12 flex flex-col gap-6">
+          <div
+            className={`flex-1 flex flex-col min-w-0 ${
+              compact
+                ? "p-5 pr-14 md:p-7 md:pr-16 gap-3"
+                : "p-8 pr-14 md:p-12 md:pr-16 gap-6"
+            }`}
+          >
             <div className="flex justify-between items-start gap-4">
               <div>
                 <p className="text-[#9A7D0A] font-black text-xs md:text-sm tracking-wider uppercase mb-1">
                   {data.kategori || "BARANG PRIBADI"}
                 </p>
-                <h2 className="text-3xl md:text-4xl font-extrabold text-[#002B5B] leading-[1.1]">
+                <h2
+                  className={`font-extrabold text-[#002B5B] leading-[1.1] ${
+                    compact ? "text-2xl md:text-3xl" : "text-3xl md:text-4xl"
+                  }`}
+                >
                   {data.nama_barang || data.nama}
                 </h2>
               </div>
@@ -113,12 +147,24 @@ const ModalDetail = ({ data, onClose, navigate }) => {
               </div>
             </div>
 
-            <p className="text-gray-500 text-sm md:text-base leading-relaxed max-w-xl">
+            <p
+              className={`text-gray-500 leading-relaxed max-w-xl ${
+                compact ? "text-sm" : "text-sm md:text-base"
+              }`}
+            >
               {data.deskripsi || "Tidak ada deskripsi tambahan untuk barang ini."}
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-2">
-              <div className="bg-[#F8FAFC] border border-gray-100 px-4 py-3 rounded-xl shadow-sm min-h-[74px]">
+            <div
+              className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${
+                compact ? "" : "my-2"
+              }`}
+            >
+              <div
+                className={`bg-[#F8FAFC] border border-gray-100 rounded-xl shadow-sm ${
+                  compact ? "px-3 py-2 min-h-[62px]" : "px-4 py-3 min-h-[74px]"
+                }`}
+              >
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
                   Lokasi
                 </p>
@@ -128,7 +174,11 @@ const ModalDetail = ({ data, onClose, navigate }) => {
                 </div>
               </div>
 
-              <div className="bg-[#F8FAFC] border border-gray-100 px-4 py-3 rounded-xl shadow-sm min-h-[74px]">
+              <div
+                className={`bg-[#F8FAFC] border border-gray-100 rounded-xl shadow-sm ${
+                  compact ? "px-3 py-2 min-h-[62px]" : "px-4 py-3 min-h-[74px]"
+                }`}
+              >
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
                   Jenis Laporan
                 </p>
@@ -138,7 +188,11 @@ const ModalDetail = ({ data, onClose, navigate }) => {
                 </div>
               </div>
 
-              <div className="bg-[#F8FAFC] border border-gray-100 px-4 py-3 rounded-xl shadow-sm min-h-[74px]">
+              <div
+                className={`bg-[#F8FAFC] border border-gray-100 rounded-xl shadow-sm ${
+                  compact ? "px-3 py-2 min-h-[62px]" : "px-4 py-3 min-h-[74px]"
+                }`}
+              >
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
                   {dateLabel}
                 </p>
@@ -148,19 +202,29 @@ const ModalDetail = ({ data, onClose, navigate }) => {
                 </div>
               </div>
 
-              <div className="bg-[#F8FAFC] border border-gray-100 px-4 py-3 rounded-xl shadow-sm min-h-[74px]">
+              <div
+                className={`bg-[#F8FAFC] border border-gray-100 rounded-xl shadow-sm ${
+                  compact ? "px-3 py-2 min-h-[62px]" : "px-4 py-3 min-h-[74px]"
+                }`}
+              >
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
                   Status Klaim
                 </p>
                 <div className="flex items-center gap-2 font-semibold text-gray-700 text-xs md:text-sm">
                   <i className="fas fa-circle-check text-[#002B5B] shrink-0"></i>
-                  <span>{canClaim ? "Belum diklaim" : "Tidak tersedia"}</span>
+                  <span>
+                    {canClaim
+                      ? "Belum diklaim"
+                      : isOwnFindingReport
+                      ? "Barang laporanmu"
+                      : "Tidak tersedia"}
+                  </span>
                 </div>
               </div>
             </div>
 
             {canClaim && (
-              <div className="bg-[#F8FAFC] border border-gray-100 rounded-2xl p-5">
+              <div className={`bg-[#F8FAFC] border border-gray-100 rounded-2xl ${compact ? "p-4" : "p-5"}`}>
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-blue-100 text-[#2563EB] flex items-center justify-center shrink-0">
                     <i className="fas fa-clipboard-check text-sm"></i>
@@ -178,7 +242,11 @@ const ModalDetail = ({ data, onClose, navigate }) => {
               </div>
             )}
 
-            <div className="flex justify-between items-center border-t border-gray-50 pt-6 mt-auto gap-4">
+            <div
+              className={`flex justify-between items-center border-t border-gray-50 mt-auto gap-4 ${
+                compact ? "pt-4" : "pt-6"
+              }`}
+            >
               <p className="text-gray-300 font-bold text-xs tracking-tight">
                 ID: #{barangId || "IPB-0851"}
               </p>
@@ -193,7 +261,7 @@ const ModalDetail = ({ data, onClose, navigate }) => {
                 </button>
               ) : (
                 <span className="bg-blue-50 text-[#2563EB] font-bold text-xs md:text-sm py-3.5 px-5 rounded-xl">
-                  Tidak tersedia untuk klaim
+                  {isOwnFindingReport ? "Tidak bisa klaim laporan sendiri" : "Tidak tersedia untuk klaim"}
                 </span>
               )}
             </div>

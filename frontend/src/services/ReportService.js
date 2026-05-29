@@ -12,7 +12,7 @@ class ReportService {
     try {
 
       const response = await fetch(
-        `${this.baseUrl}/laporan/kehilangan/me`,
+        `${this.baseUrl}/laporan/me`,
         {
           method: "GET",
 

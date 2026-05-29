@@ -5,13 +5,15 @@ from sqlalchemy import case
 
 from app.database import SessionLocal
 from app.models import User, Barang, Laporan, Notifikasi, KlaimBarang
-from app.schemas import VerifikasiLaporan, UpdateStatusBarang, VerifikasiKlaim
+from app.schemas import VerifikasiLaporan, UpdateStatusBarang, VerifikasiKlaim, VerifikasiPickup
 from app.services.admin_activity_service import (
     create_activity_log,
     export_activity_logs as export_activity_logs_service,
     get_activity_logs as get_activity_logs_service
 )
+from app.services.admin_analytics_service import get_admin_analytics
 from app.services.encryption.EncryptionService import encryption_service
+from app.services.klaim_service import KlaimService, KlaimServiceError
 
 router = APIRouter(
     prefix="/admin",
@@ -183,16 +185,32 @@ def setujui_laporan(
     laporan.verified_by = current_user.user_id
     laporan.status_laporan = "disetujui"
     laporan.status_verifikasi = "terverifikasi"
-    # Admin verification notes are sensitive and are encrypted before persistence.
-    laporan.catatan_verifikasi = encryption_service.encrypt_if_exists(data.catatan_verifikasi)
     laporan.tanggal_verifikasi = datetime.now()
+
+    dropoff_code = None
+    catatan_verifikasi = data.catatan_verifikasi
+
+    if laporan.jenis_laporan == "penemuan":
+        dropoff_code = KlaimService(db).generate_unique_dropoff_code()
+        catatan_verifikasi = KlaimService(db).build_dropoff_note(
+            dropoff_code,
+            data.catatan_verifikasi
+        )
+
+    # Admin verification notes are sensitive and are encrypted before persistence.
+    laporan.catatan_verifikasi = encryption_service.encrypt_if_exists(catatan_verifikasi)
 
     db.commit()
 
     notifikasi = Notifikasi(
         user_id=laporan.user_id,
         laporan_id=laporan.laporan_id,
-        pesan="Laporan Anda telah disetujui oleh admin",
+        pesan=(
+            f"Laporan penemuan Anda telah disetujui. Kode dropoff Anda: {dropoff_code}. "
+            "Tunjukkan kode ini ke admin saat menyerahkan barang."
+            if dropoff_code
+            else "Laporan Anda telah disetujui oleh admin"
+        ),
         status_baca=False
     )
 
@@ -349,6 +367,39 @@ def get_admin_dashboard_summary(
         "returned_items": returned_items
     }
 
+@router.patch("/klaim/pickup/verify")
+def verify_pickup(
+    data: VerifikasiPickup,
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    try:
+        result = KlaimService(db).verify_pickup_code(
+            pickup_code=data.pickup_code,
+            admin=current_user
+        )
+
+        create_activity_log(
+            db=db,
+            action_type="returned",
+            note=f"Kode {result.get('code_type', 'pickup')} {result['pickup_code']} diverifikasi admin",
+            admin_id=current_user.user_id,
+            barang_id=result["barang_id"],
+            laporan_id=result["laporan_id"],
+            klaim_id=result["klaim_id"]
+        )
+
+        db.commit()
+        return result
+    except KlaimServiceError as error:
+        db.rollback()
+        raise HTTPException(status_code=error.status_code, detail=error.detail)
+    finally:
+        db.close()
+
 @router.get("/dashboard/chart")
 def get_admin_dashboard_chart(
     current_user: User = Depends(get_current_user)
@@ -387,6 +438,26 @@ def get_admin_dashboard_chart(
     db.close()
 
     return list(reversed(result))
+
+@router.get("/analytics")
+def get_analytics(
+    range: str = "30_hari",
+    filter: str = "tinggi",
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    result = get_admin_analytics(
+        db=db,
+        time_range=range,
+        location_filter=filter
+    )
+
+    db.close()
+
+    return result
 
 @router.get("/laporan/export")
 def export_laporan(

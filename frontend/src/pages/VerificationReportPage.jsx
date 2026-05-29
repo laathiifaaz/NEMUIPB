@@ -9,6 +9,13 @@ import {
   setStoredSidebarExpanded,
 } from "../utils/sidebarState";
 
+const getCodeFromNotification = (notification) => {
+  const message = notification?.pesan || "";
+  const match = message.match(/kode (pickup|dropoff) anda:\s*([A-Z0-9@#$%]{6,8})/i);
+
+  return match ? match[2].toUpperCase() : "";
+};
+
 class VerificationReportPage extends Component {
   constructor(props) {
     super(props);
@@ -68,9 +75,7 @@ class VerificationReportPage extends Component {
         );
         const pickupNotifications = (Array.isArray(notifications) ? notifications : [])
           .filter((notification) =>
-            notification.pesan
-              ?.toLowerCase()
-              .includes("klaim barang anda diterima")
+            /kode (pickup|dropoff) anda/i.test(notification.pesan || "")
           )
           .reduce((acc, notification) => {
             if (notification.laporan_id) {
@@ -210,7 +215,7 @@ class VerificationReportPage extends Component {
 
     if (["menunggu", "diproses"].includes(status)) return 0;
     if (verification === "belum_diverifikasi") return 1;
-    if (["disetujui", "siap_diambil"].includes(status)) return 2;
+    if (["disetujui", "siap_diambil", "siap_dropoff"].includes(status)) return 2;
     if (status === "ditolak") return 4;
 
     return 3;
@@ -231,6 +236,7 @@ class VerificationReportPage extends Component {
 
   getClaimStatusForReport(report) {
     if (!report) return null;
+    if (report.jenis_laporan !== "kehilangan") return null;
 
     const pickupNotification = this.state.pickupNotifications[report.laporan_id];
 
@@ -253,6 +259,17 @@ class VerificationReportPage extends Component {
     }
 
     return null;
+  }
+
+  isReportUsedForClaim(report) {
+    if (report?.jenis_laporan !== "kehilangan") return false;
+
+    const claimStatus = this.getClaimStatusForReport(report);
+
+    return Boolean(
+      claimStatus &&
+      claimStatus.status !== "dibatalkan"
+    );
   }
 
   canCancelClaim(claimStatus) {
@@ -316,8 +333,18 @@ class VerificationReportPage extends Component {
         "nemuipb_claim_status",
         JSON.stringify(updatedClaimStatuses)
       );
+      const refreshedReports = await ReportService.getMyReports();
+      const orderedReports = this.orderReports(refreshedReports || []);
+      const refreshedSelectedReport =
+        orderedReports.find(
+          (report) =>
+            String(report.laporan_id) ===
+            String(selectedReport.laporan_id)
+        ) || selectedReport;
 
       this.setState({
+        reports: refreshedReports || [],
+        selectedReport: refreshedSelectedReport,
         claimStatuses: updatedClaimStatuses,
         cancelClaimLoading: false,
         showCancelClaimModal: false,
@@ -348,6 +375,11 @@ class VerificationReportPage extends Component {
     } = this.state;
     const selectedPickupNotification =
       selectedReport && pickupNotifications[selectedReport.laporan_id];
+    const selectedPickupCode = getCodeFromNotification(
+      selectedPickupNotification
+    );
+    const selectedIsFindingReport = selectedReport?.jenis_laporan === "penemuan";
+    const selectedCodeLabel = selectedIsFindingReport ? "Kode Dropoff" : "Kode Pickup";
     const selectedClaimStatus = selectedReport
       ? this.getClaimStatusForReport(selectedReport)
       : null;
@@ -471,7 +503,10 @@ class VerificationReportPage extends Component {
                   
 
                   <div className="max-h-[calc(100vh-220px)] overflow-y-auto pr-1 space-y-4">
-                  {orderedReports.map((report) => (
+                  {orderedReports.map((report) => {
+                    const reportUsedForClaim = this.isReportUsedForClaim(report);
+
+                    return (
                     <div
                       key={report.laporan_id}
                       onClick={() =>
@@ -560,6 +595,29 @@ class VerificationReportPage extends Component {
                           {report?.jenis_laporan || report?.jenisLaporan || "-"}
                         </p>
 
+                      {reportUsedForClaim && (
+                        <div
+                          className={`
+                            inline-flex
+                            mt-2
+                            px-3
+                            py-1
+                            rounded-full
+                            text-[10px]
+                            font-black
+                            uppercase
+                            tracking-widest
+                            ${
+                              selectedReport?.laporan_id === report.laporan_id
+                                ? "bg-white/15 text-blue-100"
+                                : "bg-blue-50 text-[#2563EB]"
+                            }
+                          `}
+                        >
+                          Klaim diajukan
+                        </div>
+                      )}
+
                       {/* DATE */}
                       <p
                         className={`
@@ -627,7 +685,8 @@ class VerificationReportPage extends Component {
                       </button>
 
                     </div>
-                  ))}
+                  );
+                })}
                   </div>
 
                 )}
@@ -703,6 +762,8 @@ class VerificationReportPage extends Component {
                       "diproses",
                       "disetujui",
                       "siap_diambil",
+                      "siap_dropoff",
+                      "selesai",
                       "ditolak"
                     ].includes(selectedReport.status_laporan)
                       ? "bg-[#0B2B5B] text-white"
@@ -772,6 +833,8 @@ class VerificationReportPage extends Component {
                       : [
                           "disetujui",
                           "siap_diambil",
+                          "siap_dropoff",
+                          "selesai",
                           "ditolak"
                         ].includes(selectedReport.status_laporan)
 
@@ -821,7 +884,7 @@ class VerificationReportPage extends Component {
                     selectedReport.status_laporan === "ditolak"
                       ? "bg-red-100 text-red-600"
 
-                      : ["disetujui", "siap_diambil", "selesai", "dikembalikan"].includes(
+                      : ["disetujui", "siap_diambil", "siap_dropoff", "selesai", "dikembalikan"].includes(
                           selectedReport.status_laporan
                         )
                       ? "bg-[#0B2B5B] text-white"
@@ -858,7 +921,7 @@ class VerificationReportPage extends Component {
                         ? "text-red-500"
                         : selectedReport.status_laporan === "disetujui"
                         ? "text-green-600"
-                        : ["siap_diambil", "selesai", "dikembalikan"].includes(
+                        : ["siap_diambil", "siap_dropoff", "selesai", "dikembalikan"].includes(
                             selectedReport.status_laporan
                           )
                         ? "text-green-600"
@@ -878,8 +941,11 @@ class VerificationReportPage extends Component {
                       : selectedReport.status_laporan === "siap_diambil"
                       ? "Barang siap diambil"
 
+                      : selectedReport.status_laporan === "siap_dropoff"
+                      ? "Barang siap didropoff"
+
                       : ["selesai", "dikembalikan"].includes(selectedReport.status_laporan)
-                      ? "Barang sudah diambil"
+                      ? "Selesai"
 
                       : "Menunggu verifikasi"}
 
@@ -956,7 +1022,11 @@ class VerificationReportPage extends Component {
                       font-bold
 
                       ${
-                        selectedClaimStatus?.status === "diterima"
+                        selectedIsFindingReport && selectedPickupNotification
+                          ? "bg-[#0B2B5B] text-white"
+                          : selectedIsFindingReport
+                          ? "bg-[#DBEAFE] text-[#2563EB]"
+                          : selectedClaimStatus?.status === "diterima"
                           ? "bg-[#0B2B5B] text-white"
                           : selectedClaimStatus
                           ? "bg-[#DBEAFE] text-[#2563EB]"
@@ -976,7 +1046,9 @@ class VerificationReportPage extends Component {
                 <div className="flex-1">
 
                   <h3 className="text-[17px] font-bold text-[#0B2B5B]">
-                    {selectedClaimStatus?.status === "diterima"
+                    {selectedIsFindingReport
+                      ? "Dropoff Barang"
+                      : selectedClaimStatus?.status === "diterima"
                       ? "Klaim Disetujui"
                       : selectedClaimStatus
                       ? "Klaim Sedang Diajukan"
@@ -984,7 +1056,9 @@ class VerificationReportPage extends Component {
                   </h3>
 
                   <p className="text-[12px] text-gray-500">
-                    {selectedClaimStatus?.status === "diterima"
+                    {selectedIsFindingReport
+                      ? "Tunjukkan kode dropoff kepada admin saat menyerahkan barang."
+                      : selectedClaimStatus?.status === "diterima"
                       ? "Klaim barang sudah disetujui admin."
                       : selectedClaimStatus
                       ? `Kamu sedang mengajukan klaim barang untuk laporan kehilangan ${selectedReport.nama_barang}. Tunggu verifikasi admin.`
@@ -993,7 +1067,7 @@ class VerificationReportPage extends Component {
                       : "Klaim bisa diajukan setelah laporan diverifikasi."}
                   </p>
 
-                  {selectedClaimStatus && (
+                  {!selectedIsFindingReport && selectedClaimStatus && (
                     <div
                       className={`
                         inline-flex
@@ -1024,7 +1098,8 @@ class VerificationReportPage extends Component {
                     </div>
                   )}
 
-                  {selectedClaimStatus &&
+                  {!selectedIsFindingReport &&
+                    selectedClaimStatus &&
                     selectedClaimStatus.status === "diproses" &&
                     canCancelSelectedClaim && (
                     <div className="mt-4">
@@ -1055,7 +1130,8 @@ class VerificationReportPage extends Component {
                     </div>
                   )}
 
-                  {selectedClaimStatus &&
+                  {!selectedIsFindingReport &&
+                    selectedClaimStatus &&
                     selectedClaimStatus.status === "diproses" &&
                     !canCancelSelectedClaim && (
                     <p className="mt-3 text-[11px] text-gray-400 font-semibold">
@@ -1063,7 +1139,8 @@ class VerificationReportPage extends Component {
                     </p>
                   )}
 
-                  {!selectedClaimStatus &&
+                  {!selectedIsFindingReport &&
+                    !selectedClaimStatus &&
                     selectedReport.status_verifikasi === "terverifikasi" && (
                     <button
                       type="button"
@@ -1106,7 +1183,7 @@ class VerificationReportPage extends Component {
                       font-bold
 
                       ${
-                        selectedPickupNotification
+                    selectedPickupNotification || selectedReport.status_laporan === "selesai"
                           ? "bg-[#DBEAFE] text-[#2563EB]"
                           : "bg-gray-100 text-gray-400"
                       }
@@ -1120,13 +1197,64 @@ class VerificationReportPage extends Component {
                 <div className="flex-1">
 
                   <h3 className="text-[17px] font-bold text-[#0B2B5B]">
-                    Siap Diambil
+                    {selectedIsFindingReport ? "Dropoff Barang" : "Siap Diambil"}
                   </h3>
 
                   <p className="text-[12px] text-gray-500">
-                    {selectedPickupNotification
-                      ? "Datang ke lokasi pengambilan dan tunjukkan laporan ini kepada petugas."
+                    {selectedIsFindingReport && selectedPickupNotification
+                      ? "Serahkan barang dan tunjukkan kode dropoff kepada admin."
+                      : selectedIsFindingReport
+                      ? "Kode dropoff akan tampil setelah laporan penemuan disetujui admin."
+                      : selectedPickupNotification
+                      ? "Datang ke lokasi pengambilan dan tunjukkan kode pickup kepada admin."
                       : "Informasi pengambilan akan tampil setelah klaim disetujui admin."}
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* STEP 6 */}
+              <div className="flex gap-4">
+
+                <div className="flex flex-col items-center">
+
+                  <div
+                    className={`
+                      w-11
+                      h-11
+                      rounded-2xl
+                      flex
+                      items-center
+                      justify-center
+                      text-sm
+                      font-bold
+                      ${
+                        selectedReport.status_laporan === "selesai"
+                          ? "bg-[#0B2B5B] text-white"
+                          : "bg-gray-100 text-gray-400"
+                      }
+                    `}
+                  >
+                    <i className="fas fa-check-double"></i>
+                  </div>
+
+                </div>
+
+                <div className="flex-1">
+
+                  <h3 className="text-[17px] font-bold text-[#0B2B5B]">
+                    Selesai
+                  </h3>
+
+                  <p className="text-[12px] text-gray-500">
+                    {selectedReport.status_laporan === "selesai"
+                      ? selectedIsFindingReport
+                        ? "Dropoff barang sudah diverifikasi admin."
+                        : "Pengambilan barang sudah diverifikasi admin."
+                      : selectedIsFindingReport
+                      ? "Selesai setelah admin memverifikasi kode dropoff."
+                      : "Selesai setelah admin memverifikasi kode pickup."}
                   </p>
 
                 </div>
@@ -1267,13 +1395,19 @@ class VerificationReportPage extends Component {
 
                   <h2 className="text-[24px] font-bold mb-2">
                     {selectedPickupNotification
-                      ? "Karcis Pengambilan"
+                      ? selectedCodeLabel
+                      : selectedIsFindingReport
+                      ? "Kode Dropoff"
                       : "Kode Pengambilan"}
                   </h2>
 
                   <p className="text-[12px] text-gray-300 mb-5">
                     {selectedPickupNotification
-                      ? "Tunjukkan laporan ini kepada petugas saat mengambil barang."
+                      ? selectedIsFindingReport
+                        ? "Tunjukkan kode ini kepada admin saat menyerahkan barang."
+                        : "Tunjukkan kode ini kepada admin saat mengambil barang."
+                      : selectedIsFindingReport
+                      ? "Ditampilkan setelah laporan penemuan disetujui admin"
                       : "Ditampilkan setelah klaim barang diterima admin"}
                   </p>
 
@@ -1283,25 +1417,29 @@ class VerificationReportPage extends Component {
                     {selectedPickupNotification ? (
                       <>
                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                          Bukti Pengambilan
+                          {selectedCodeLabel}
                         </p>
-                        <p className="text-3xl font-black">
-                          #IPB-{selectedReport.laporan_id}
+                        <p className="text-4xl font-black tracking-[0.2em]">
+                          {selectedPickupCode || "------"}
                         </p>
                         <div className="w-full border-t border-dashed border-gray-200 my-4"></div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                          Barang yang diambil
+                          {selectedIsFindingReport ? "Barang yang diserahkan" : "Barang yang diambil"}
                         </p>
                         <p className="text-sm font-black">
                           {selectedReport.nama_barang}
                         </p>
                         <p className="text-xs text-gray-500 mt-3 leading-relaxed">
-                          Tunjukkan karcis ini dan identitas ke petugas.
+                          {selectedIsFindingReport
+                            ? "Tunjukkan kode dropoff dan identitas ke admin. Kode akan diverifikasi untuk menyelesaikan dropoff."
+                            : "Tunjukkan kode pickup dan identitas ke admin. Kode akan diverifikasi untuk menyelesaikan pengambilan."}
                         </p>
                       </>
                     ) : (
                       <p className="font-bold text-sm">
-                        Menunggu klaim diterima
+                        {selectedIsFindingReport
+                          ? "Menunggu laporan penemuan disetujui"
+                          : "Menunggu klaim diterima"}
                       </p>
                     )}
                   </div>

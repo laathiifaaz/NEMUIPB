@@ -1,6 +1,5 @@
 import React, { Component } from "react";
 import AuthService from "../../services/AuthService";
-import GuidePopup from "../GuidePopup";
 
 class AdminSidebar extends Component {
   constructor(props) {
@@ -8,7 +7,6 @@ class AdminSidebar extends Component {
 
     this.state = {
       hoverExpanded: false,
-      showGuidePopup: false,
     };
   }
 
@@ -176,31 +174,6 @@ class AdminSidebar extends Component {
         </nav>
 
         <div className="mt-auto flex flex-col gap-2">
-          <div
-            onClick={() => this.setState({ showGuidePopup: true })}
-            className={`flex items-center h-12 rounded-2xl text-gray-500 hover:text-[#002B5B] hover:bg-[#EEF4FB] cursor-pointer transition-colors ${
-              expanded ? "px-4" : "justify-center px-0"
-            }`}
-          >
-            <div className="w-5 flex justify-center flex-shrink-0">
-              <i className="far fa-question-circle text-xl"></i>
-            </div>
-
-            <span
-              className={`
-                font-bold text-sm whitespace-nowrap overflow-hidden
-                transition-all duration-200
-                ${
-                  expanded
-                    ? "ml-3 max-w-32 opacity-100"
-                    : "ml-0 max-w-0 opacity-0"
-                }
-              `}
-            >
-              Panduan
-            </span>
-          </div>
-
           <button
             onClick={this.handleLogout}
             className={`flex items-center h-12 w-full bg-[#1D3557] text-white rounded-2xl hover:bg-red-800 transition-colors ${
@@ -226,12 +199,6 @@ class AdminSidebar extends Component {
             </span>
           </button>
         </div>
-
-        <GuidePopup
-          open={this.state.showGuidePopup}
-          variant="admin"
-          onClose={() => this.setState({ showGuidePopup: false })}
-        />
       </aside>
     );
   }

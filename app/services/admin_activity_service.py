@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from sqlalchemy import and_, or_
+
 from app.models import ActivityLog, Barang, KlaimBarang, Laporan, User
 
 
@@ -83,10 +85,19 @@ def _get_claim_activity_logs(db, action_type: str):
     if action_type == "claim_pending":
         claim_query = claim_query.filter(KlaimBarang.status_klaim == "diproses")
     elif action_type == "returned":
-        claim_query = claim_query.filter(KlaimBarang.status_klaim == "diterima")
+        claim_query = claim_query.filter(
+            KlaimBarang.status_klaim == "diterima",
+            Barang.status_barang == "selesai"
+        )
     else:
         claim_query = claim_query.filter(
-            KlaimBarang.status_klaim.in_(["diproses", "diterima"])
+            or_(
+                KlaimBarang.status_klaim == "diproses",
+                and_(
+                    KlaimBarang.status_klaim == "diterima",
+                    Barang.status_barang == "selesai"
+                )
+            )
         )
 
     result = []

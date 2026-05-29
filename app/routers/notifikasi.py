@@ -21,11 +21,15 @@ def get_notifikasi( current_user: User = Depends(get_current_user)):
     return notifikasi
 
 @router.patch("/{id}/read")
-def read_notifikasi(id: int):
+def read_notifikasi(
+    id: int,
+    current_user: User = Depends(get_current_user)
+):
     db = SessionLocal()
 
     notif = db.query(Notifikasi).filter(
-        Notifikasi.notifikasi_id == id
+        Notifikasi.notifikasi_id == id,
+        Notifikasi.user_id == current_user.user_id
     ).first()
 
     if not notif:

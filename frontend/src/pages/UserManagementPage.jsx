@@ -151,6 +151,7 @@ class UserManagementPage extends Component {
           >
             <PageHeader
               onToggleSidebar={this.toggleSidebar}
+              navigate={this.props.navigate}
               profileIcon="fa-user-shield"
               actions={
                 <button

@@ -4,6 +4,7 @@ import AdminService from "../services/AdminService";
 import AdminSidebar from "../components/admin/AdminSidebar";
 import PageHeader from "../components/PageHeader";
 import PageFooter from "../components/PageFooter";
+import ReportTrendChart from "../components/admin/ReportTrendChart";
 import {
   getStoredSidebarExpanded,
   setStoredSidebarExpanded,
@@ -21,7 +22,7 @@ class AdminDashboardPage extends Component {
         pending_claims: 0,
         returned_items: 0,
       },
-      chart: [],
+      monthlyTrends: [],
       reports: [],
       selectedReport: null,
       showDetailModal: false,
@@ -32,6 +33,10 @@ class AdminDashboardPage extends Component {
       },
       selectedFilter: "semua",
       showFilterMenu: false,
+      pickupCode: "",
+      pickupLoading: false,
+      pickupMessage: "",
+      pickupError: "",
       isLoading: true,
       error: null,
       isSidebarExpanded: getStoredSidebarExpanded(),
@@ -62,15 +67,16 @@ class AdminDashboardPage extends Component {
   loadDashboardData = async () => {
     try {
       const summary = await AdminService.getSummary();
-      const chart = await AdminService.getChart();
-      const reports = await AdminService.getRecentReports(
-        this.state.selectedFilter
-      );
+      const analytics = await AdminService.getAnalytics({
+        range: "30_hari",
+        filter: "tinggi",
+      });
+      const reports = await AdminService.getAllReports();
 
       this.setState({
         summary,
-        chart,
-        reports,
+        monthlyTrends: analytics.monthlyTrends || [],
+        reports: this.getDashboardReports(reports),
         isLoading: false,
         error: null,
       });
@@ -129,12 +135,31 @@ class AdminDashboardPage extends Component {
   };
 
   isFinalStatus(report) {
-    return (
-      report.status_barang === "selesai" ||
-      report.status_barang === "dikembalikan" ||
-      report.status_laporan === "disetujui" ||
-      report.status_laporan === "ditolak"
-    );
+    return report.status_verifikasi !== "belum_diverifikasi";
+  }
+
+  getDashboardReports(reports) {
+    const normalizedReports = (Array.isArray(reports) ? reports : []).map((report) => ({
+      ...report,
+      item_name: report.item_name || report.nama_barang,
+      reporter: report.reporter || report.pelapor,
+    }));
+
+    const filteredReports =
+      this.state.selectedFilter === "semua"
+        ? normalizedReports
+        : normalizedReports.filter(
+            (report) => report.status_verifikasi === this.state.selectedFilter
+          );
+
+    return [
+      ...filteredReports.filter(
+        (report) => report.status_verifikasi === "belum_diverifikasi"
+      ),
+      ...filteredReports.filter(
+        (report) => report.status_verifikasi !== "belum_diverifikasi"
+      ),
+    ];
   }
 
   openVerifyConfirm = (laporanId) => {
@@ -185,6 +210,51 @@ class AdminDashboardPage extends Component {
       await this.loadDashboardData();
     } catch (error) {
       alert(error.message);
+    }
+  };
+
+  handlePickupCodeChange = (event) => {
+    this.setState({
+      pickupCode: event.target.value.toUpperCase().replace(/[^A-Z0-9@#$%]/g, "").slice(0, 8),
+      pickupMessage: "",
+      pickupError: "",
+    });
+  };
+
+  handleVerifyPickup = async () => {
+    const pickupCode = this.state.pickupCode.trim();
+
+    if (!pickupCode) {
+      this.setState({
+        pickupError: "Kode pickup wajib diisi.",
+        pickupMessage: "",
+      });
+      return;
+    }
+
+    try {
+      this.setState({
+        pickupLoading: true,
+        pickupError: "",
+        pickupMessage: "",
+      });
+
+      const result = await AdminService.verifyPickupCode(pickupCode);
+
+      this.setState({
+        pickupCode: "",
+        pickupLoading: false,
+        pickupMessage: result.message || "Kode pickup berhasil diverifikasi.",
+        pickupError: "",
+      });
+
+      await this.loadDashboardData();
+    } catch (error) {
+      this.setState({
+        pickupLoading: false,
+        pickupError: error.message || "Gagal memverifikasi kode pickup.",
+        pickupMessage: "",
+      });
     }
   };
 
@@ -247,6 +317,8 @@ class AdminDashboardPage extends Component {
   };
 
   getStatusClass(status) {
+    if (status === "belum_diverifikasi") return "bg-yellow-100 text-yellow-700";
+    if (status === "terverifikasi") return "bg-green-100 text-green-700";
     if (status === "ditemukan") return "bg-[#006D8F] text-white";
     if (status === "hilang") return "bg-blue-100 text-[#002B5B]";
     if (status === "selesai" || status === "dikembalikan")
@@ -257,49 +329,7 @@ class AdminDashboardPage extends Component {
   }
 
   renderChart() {
-    const { chart } = this.state;
-
-    if (!chart || chart.length === 0) {
-      return (
-        <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
-          Belum ada data grafik.
-        </div>
-      );
-    }
-
-    const maxValue = Math.max(
-      ...chart.map((item) => Math.max(item.lost || 0, item.found || 0)),
-      1
-    );
-
-    return (
-      <div className="h-64 flex items-end gap-8 px-6">
-        {chart.map((item, index) => {
-          const lostHeight = ((item.lost || 0) / maxValue) * 100;
-          const foundHeight = ((item.found || 0) / maxValue) * 100;
-
-          return (
-            <div key={index} className="flex-1 flex flex-col items-center">
-              <div className="w-full h-48 flex items-end gap-1">
-                <div
-                  className="w-full bg-[#002B5B] rounded-t-sm"
-                  style={{ height: `${Math.max(lostHeight, 8)}%` }}
-                ></div>
-                <div
-                  className="w-full bg-[#F7E7AA] rounded-t-sm"
-                  style={{ height: `${Math.max(foundHeight, 8)}%` }}
-                ></div>
-              </div>
-              <p className="text-[10px] text-gray-400 mt-4">
-                {String(item.week || "")
-                  .replace(/^wk\s*/i, "Minggu ")
-                  .replace(/^week\s*/i, "Minggu ")}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    );
+    return <ReportTrendChart data={this.state.monthlyTrends} heightClass="h-72" />;
   }
 
   getImageSrc(dokumentasi) {
@@ -477,7 +507,7 @@ class AdminDashboardPage extends Component {
 }
 
   render() {
-    const { reports, summary, error, isLoading } = this.state;
+    const { reports, summary, error, isLoading, pickupCode, pickupLoading, pickupMessage, pickupError } = this.state;
 
     return (
       <div className="min-h-screen bg-[#F6F7FB] font-['Plus_Jakarta_Sans'] text-[#002B5B]">
@@ -497,6 +527,7 @@ class AdminDashboardPage extends Component {
           >
             <PageHeader
               onToggleSidebar={this.toggleSidebar}
+              navigate={this.props.navigate}
               profileIcon="fa-user-shield"
               actions={
                 <button
@@ -560,19 +591,19 @@ class AdminDashboardPage extends Component {
               <div className="lg:col-span-2 bg-white rounded-[30px] p-8 shadow-sm">
                 <div className="flex justify-between items-start mb-8">
                   <div>
-                    <h3 className="text-xl font-extrabold">Trends & Metrics</h3>
+                    <h3 className="text-xl font-extrabold">Tren Laporan</h3>
                     <p className="text-xs text-gray-400">
-                      Volume Hilang vs Ditemukan (30 hari terakhir)
+                      Perbandingan laporan masuk dan barang ditemukan
                     </p>
                   </div>
 
                   <div className="flex gap-4 text-xs font-bold">
-                    <span>
-                      <i className="fas fa-circle text-[#002B5B] mr-1"></i>
-                      Hilang
+                    <span className="flex items-center gap-1.5 text-[#002B5B]">
+                      <span className="w-3 h-3 rounded-sm bg-[#A2B4C7]"></span>
+                      Dilaporkan
                     </span>
-                    <span>
-                      <i className="fas fa-circle text-[#F4D35E] mr-1"></i>
+                    <span className="flex items-center gap-1.5 text-[#002B5B]">
+                      <span className="w-3 h-3 rounded-sm bg-[#8E793E]"></span>
                       Ditemukan
                     </span>
                   </div>
@@ -588,20 +619,44 @@ class AdminDashboardPage extends Component {
                   </div>
 
                   <h3 className="text-2xl font-medium leading-tight mb-3">
-                    Menunggu Verifikasi Identitas
+                    Verifikasi Kode Pickup/Dropoff
                   </h3>
 
                   <p className="text-sm text-white/60 leading-relaxed">
-                    Ada {summary.pending_claims} klaim barang yang menunggu verifikasi admin.
+                    Masukkan kode pickup/dropoff yang ditunjukkan user untuk menyelesaikan pengambilan atau penyerahan barang.
                   </p>
+
+                  <div className="mt-6">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/60">
+                      Kode Pickup/Dropoff
+                    </label>
+                    <input
+                      type="text"
+                      value={pickupCode}
+                      onChange={this.handlePickupCodeChange}
+                      placeholder="ABCDEF"
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-center text-xl font-black tracking-[0.35em] text-[#002B5B] outline-none placeholder:text-gray-300"
+                    />
+                    {pickupMessage && (
+                      <p className="mt-3 rounded-xl bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-100">
+                        {pickupMessage}
+                      </p>
+                    )}
+                    {pickupError && (
+                      <p className="mt-3 rounded-xl bg-red-500/15 px-3 py-2 text-xs font-bold text-red-100">
+                        {pickupError}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => this.props.navigate("/admin/verifikasi")}
-                  className="mt-8 w-full bg-[#F4D35E] text-[#5C4A00] py-4 rounded-2xl text-xs font-black tracking-widest hover:scale-105 transition-all"
+                  onClick={this.handleVerifyPickup}
+                  disabled={pickupLoading}
+                  className="mt-8 w-full bg-[#F4D35E] text-[#5C4A00] py-4 rounded-2xl text-xs font-black tracking-widest hover:scale-105 disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:scale-100 transition-all"
                 >
-                  VERIFIKASI KLAIM
+                  {pickupLoading ? "MEMVERIFIKASI..." : "VERIFIKASI KODE"}
                 </button>
               </div>
             </section>
@@ -671,7 +726,7 @@ class AdminDashboardPage extends Component {
                     </thead>
 
                     <tbody>
-                      {[...reports.filter((report) => report.status_verifikasi === "belum_diverifikasi"), ...reports.filter((report) => report.status_verifikasi !== "belum_diverifikasi")].map((report) => {
+                      {reports.map((report) => {
                         const disabled = this.isFinalStatus(report);
 
                         return (
@@ -695,10 +750,10 @@ class AdminDashboardPage extends Component {
                             <td className="py-5">
                               <span
                                 className={`px-3 py-1 rounded-full text-[10px] font-black ${this.getStatusClass(
-                                  report.status_barang
+                                  report.status_verifikasi
                                 )}`}
                               >
-                                {report.status_barang}
+                                {String(report.status_verifikasi || "-").replace("_", " ")}
                               </span>
                             </td>
 

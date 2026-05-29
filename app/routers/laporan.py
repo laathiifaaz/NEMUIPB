@@ -10,6 +10,25 @@ router = APIRouter(
     tags=["Laporan"]
 )
 
+
+def _build_user_report_response(laporan, barang):
+    return {
+        "laporan_id": laporan.laporan_id,
+        "nama_barang": barang.nama_barang,
+        "kategori": barang.kategori,
+        "deskripsi": barang.deskripsi,
+        "lokasi": barang.lokasi,
+        "tanggal_kejadian": barang.tanggal_kejadian,
+        "created_time": barang.created_time,
+        "status_laporan": laporan.status_laporan,
+        "status_verifikasi": laporan.status_verifikasi,
+        "jenis_laporan": laporan.jenis_laporan,
+        "status_barang": barang.status_barang,
+        "catatan_verifikasi": encryption_service.decrypt_if_exists(
+            laporan.catatan_verifikasi
+        )
+    }
+
 @router.get("/")
 def get_laporan():
     db = SessionLocal()
@@ -120,23 +139,50 @@ def get_laporan_kehilangan_user(
         .all()
     )
 
-    result = []
+    result = [_build_user_report_response(laporan, barang) for laporan, barang in data]
 
-    for laporan, barang in data:
-        result.append({
-            "laporan_id": laporan.laporan_id,
-            "nama_barang": barang.nama_barang,
-            "kategori": barang.kategori,
-            "lokasi": barang.lokasi,
-            "tanggal_kejadian": barang.tanggal_kejadian,
-            "created_time": barang.created_time,
-            "status_laporan": laporan.status_laporan,
-            "status_verifikasi": laporan.status_verifikasi,
-            "jenis_laporan": laporan.jenis_laporan,
-            "catatan_verifikasi": encryption_service.decrypt_if_exists(
-                laporan.catatan_verifikasi
-            )
-        })
+    db.close()
+
+    return result
+
+
+@router.get("/penemuan/me")
+def get_laporan_penemuan_user(
+    current_user: User = Depends(get_current_user)
+):
+    db = SessionLocal()
+
+    data = (
+        db.query(Laporan, Barang)
+        .join(Barang, Laporan.barang_id == Barang.barang_id)
+        .filter(
+            Laporan.user_id == current_user.user_id,
+            Laporan.jenis_laporan == "penemuan"
+        )
+        .all()
+    )
+
+    result = [_build_user_report_response(laporan, barang) for laporan, barang in data]
+
+    db.close()
+
+    return result
+
+
+@router.get("/me")
+def get_laporan_user(
+    current_user: User = Depends(get_current_user)
+):
+    db = SessionLocal()
+
+    data = (
+        db.query(Laporan, Barang)
+        .join(Barang, Laporan.barang_id == Barang.barang_id)
+        .filter(Laporan.user_id == current_user.user_id)
+        .all()
+    )
+
+    result = [_build_user_report_response(laporan, barang) for laporan, barang in data]
 
     db.close()
 

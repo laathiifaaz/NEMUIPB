@@ -42,6 +42,7 @@ class KoleksiBarangPage extends Component {
       startDate: "",
       endDate: "",
       searchKeyword: "",
+      allItems: [],
       items: [],
       loading: true,
       error: null,
@@ -124,9 +125,23 @@ class KoleksiBarangPage extends Component {
 
   getVerifiedItems(items) {
     return (Array.isArray(items) ? items : []).filter(
-      (item) =>
-        item.status_verifikasi === "terverifikasi" &&
-        item.status_laporan === "disetujui"
+      (item) => {
+        const allowedStatus = ["hilang", "ditemukan", "selesai"].includes(
+          item.status_barang
+        );
+
+        if (!allowedStatus || item.status_verifikasi !== "terverifikasi") {
+          return false;
+        }
+
+        if (item.jenis_laporan === "penemuan") {
+          return item.status_laporan === "selesai";
+        }
+
+        return ["disetujui", "siap_diambil", "selesai"].includes(
+          item.status_laporan
+        );
+      }
     );
   }
 
@@ -181,7 +196,10 @@ class KoleksiBarangPage extends Component {
       const isClaimPending =
         item.status_barang === "diklaim" ||
         item.status_barang === "claim_pending" ||
-        pendingClaimedBarangIds.has(String(item.barang_id));
+        (
+          item.status_barang === "ditemukan" &&
+          pendingClaimedBarangIds.has(String(item.barang_id))
+        );
 
       if (isClaimPending) {
         return false;
@@ -227,9 +245,11 @@ class KoleksiBarangPage extends Component {
 
     try {
       const data = await BarangService.getAllBarang();
+      const allItems = Array.isArray(data) ? data : [];
 
       this.setState({
-        items: this.getVisibleItems(data, ""),
+        allItems,
+        items: this.getVisibleItems(allItems, this.state.searchKeyword),
         loading: false,
         currentPage: 1, // Reset ke halaman pertama setiap kali filter berubah
       });
@@ -243,45 +263,34 @@ class KoleksiBarangPage extends Component {
   };
 
   handleSearch = async () => {
-    const keyword = this.state.searchKeyword.trim();
+    const keyword = this.state.searchKeyword;
 
-    if (!keyword) {
-      await this.fetchBarang();
-      return;
-    }
-
-    this.setState({ loading: true, error: null });
-
-    try {
-      const data = await BarangService.getAllBarang();
-
-      this.setState({
-        items: this.getVisibleItems(data, keyword),
-        loading: false,
-        currentPage: 1, // Reset ke halaman pertama setiap kali mencari barang
-      });
-    } catch (error) {
-      this.setState({
-        items: [],
-        loading: false,
-        error: error.message,
-      });
-    }
+    this.setState({
+      items: this.getVisibleItems(this.state.allItems, keyword),
+      currentPage: 1,
+    });
   };
 
-  handleSearchKeyDown = async (event) => {
-    if (event.key === "Enter") {
-      await this.handleSearch();
-    }
+  handleSearchChange = (event) => {
+    const keyword = event.target.value;
+
+    this.setState({
+      searchKeyword: keyword,
+      items: this.getVisibleItems(this.state.allItems, keyword),
+      currentPage: 1,
+    });
   };
 
   updateFilter = (key, value) => {
     this.setState(
       {
         [key]: value,
-        searchKeyword: "",
       },
-      this.fetchBarang
+      () =>
+        this.setState({
+          items: this.getVisibleItems(this.state.allItems),
+          currentPage: 1,
+        })
     );
   };
 
@@ -418,21 +427,9 @@ class KoleksiBarangPage extends Component {
                     placeholder="Cari barang"
                     className="w-full bg-white border border-gray-100 rounded-xl py-3 pl-12 pr-4 text-sm outline-none focus:border-[#002B5B]"
                     value={this.state.searchKeyword}
-                    onChange={(event) =>
-                      this.setState({ searchKeyword: event.target.value })
-                    }
-                    onKeyDown={this.handleSearchKeyDown}
+                    onChange={this.handleSearchChange}
                   />
                 </div>
-
-                <button
-                  type="button"
-                  onClick={this.handleSearch}
-                  className="w-12 h-12 rounded-xl bg-[#002B5B] text-white hover:bg-[#001f42] transition-colors"
-                  aria-label="Cari barang"
-                >
-                  <i className="fas fa-search"></i>
-                </button>
               </div>
             </div>
           </section>
@@ -655,6 +652,7 @@ class KoleksiBarangPage extends Component {
             data={this.state.selectedBarang}
             onClose={this.closeModal}
             navigate={this.props.navigate}
+            compact
           />
         )}
       </>

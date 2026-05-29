@@ -26,6 +26,7 @@ def get_all_barang():
         {
             "barang_id": item.barang_id,
             "laporan_id": laporan.laporan_id if laporan else None,
+            "pelapor_user_id": laporan.user_id if laporan else None,
             "jenis_laporan": laporan.jenis_laporan if laporan else None,
             "status_laporan": laporan.status_laporan if laporan else None,
             "status_verifikasi": laporan.status_verifikasi if laporan else None,
