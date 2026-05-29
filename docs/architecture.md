@@ -1,47 +1,77 @@
 # Arsitektur NEMU IPB
 
-NEMU IPB menggunakan struktur monorepo dengan pemisahan backend, frontend, dokumentasi, dan tools pendukung.
+NEMU IPB menggunakan arsitektur monorepo dengan pemisahan backend, frontend, dokumentasi, dan tools pendukung.
 
-## Komponen Utama
+## Ringkasan Komponen
 
-- `backend/`: aplikasi FastAPI, model SQLAlchemy, router API, service layer, schema Pydantic, dan utility keamanan.
-- `frontend/`: aplikasi React, halaman user/admin, komponen UI, dan service wrapper untuk memanggil API backend.
-- `docs/`: dokumentasi teknis seperti threat modeling dan ringkasan arsitektur.
-- `tools/`: script pendukung repository, misalnya generator PDF threat modeling.
+- Frontend React berada di `frontend/`.
+- Backend FastAPI berada di `backend/app/`.
+- PostgreSQL digunakan sebagai database utama.
+- SQLAlchemy digunakan sebagai ORM.
+- Alembic digunakan untuk database migration.
+- Dokumentasi teknis berada di `docs/`.
+- Script pendukung berada di `tools/`.
 
-## Backend
+## Alur Komunikasi
 
-Backend berada di `backend/app/`. Entry point aplikasi adalah `backend/app/main.py`. Router API dikelompokkan di `backend/app/routers/`, sedangkan business logic berada di `backend/app/services/`.
+Frontend React berkomunikasi dengan Backend FastAPI melalui REST API. Base URL API dikonfigurasi di `frontend/src/config/api.js` melalui environment variable `REACT_APP_API_BASE_URL`.
 
-Backend dapat dijalankan dari folder `backend/` dengan:
-
-```powershell
-uvicorn app.main:app --reload
+```text
+React Frontend -> Service Layer Frontend -> REST API FastAPI -> Service Layer Backend -> SQLAlchemy -> PostgreSQL
 ```
 
-## Frontend
+## Struktur Backend
 
-Frontend berada di `frontend/` dan menggunakan React. Konfigurasi base URL API ada di `frontend/src/config/api.js`, dengan dukungan environment variable `REACT_APP_API_BASE_URL`.
+- `backend/app/main.py`: entry point FastAPI.
+- `backend/app/routers/`: endpoint API, seperti auth, barang, laporan, klaim, notifikasi, admin, dan serah terima.
+- `backend/app/services/`: business logic untuk klaim, analytics, activity log, encryption, serah terima, dan logic pendukung lain.
+- `backend/app/models.py`: definisi model SQLAlchemy.
+- `backend/app/schemas.py`: schema request/response Pydantic.
+- `backend/app/database.py`: konfigurasi koneksi database.
+- `backend/database/migrations/`: konfigurasi dan versi migration Alembic.
 
-## Komunikasi Frontend dan Backend
+## Struktur Frontend
 
-Frontend memanggil backend melalui endpoint HTTP API. Service client berada di `frontend/src/services/`, seperti `AuthService`, `BarangService`, `ReportService`, `AdminService`, dan `NotifikasiService`.
+- `frontend/src/pages/`: halaman aplikasi user dan admin.
+- `frontend/src/components/`: komponen UI reusable.
+- `frontend/src/services/`: wrapper pemanggilan API backend.
+- `frontend/src/config/api.js`: konfigurasi base URL backend.
+- `frontend/src/utils/`: utility frontend.
 
-## Alur Fitur Besar
+## Database Migration
 
-1. User membuat laporan kehilangan atau penemuan.
-2. Admin memverifikasi laporan melalui halaman verifikasi.
-3. Untuk laporan penemuan, sistem membuat kode dropoff. Setelah kode dropoff diverifikasi admin, barang muncul sebagai barang ditemukan yang dapat diklaim user lain.
-4. User mengajukan klaim barang menggunakan laporan kehilangan miliknya.
-5. Admin memverifikasi klaim. Jika diterima, sistem membuat kode pickup.
-6. Setelah kode pickup diverifikasi admin, status barang/laporan terkait menjadi selesai.
-7. Sistem mengirim notifikasi untuk perubahan penting seperti verifikasi laporan, klaim diterima/ditolak, dropoff, dan pickup.
-8. Admin dapat melihat analytics, tren laporan, aktivitas, dan verifikasi serah terima.
+Alembic dikonfigurasi di `backend/alembic.ini` dan migration berada di `backend/database/migrations/`.
 
-## Dokumentasi Keamanan
+Command utama dari folder `backend/`:
 
-Threat modeling tersedia di `docs/Threat_Modeling.pdf`. File tersebut dapat dibuat ulang dengan script:
-
-```powershell
-python tools/build_threat_model_pdf.py
+```bash
+alembic upgrade head
+alembic current
+alembic history
+alembic revision --autogenerate -m "deskripsi perubahan"
 ```
+
+Migration awal membuat schema utama aplikasi. Migration `001_seed_initial_users.py` mengisi user awal untuk role civitas dan admin.
+
+## Alur Fitur Utama
+
+1. User login atau register.
+2. User membuat laporan barang hilang atau barang temuan.
+3. Admin memverifikasi laporan.
+4. Untuk laporan penemuan, sistem membuat kode dropoff.
+5. Setelah kode dropoff diverifikasi admin, barang muncul sebagai barang ditemukan dan dapat diklaim user lain.
+6. User membuat klaim menggunakan laporan kehilangan miliknya.
+7. Admin memverifikasi klaim. Jika klaim diterima, sistem membuat kode pickup.
+8. Setelah kode pickup diverifikasi admin, status barang dan laporan terkait diperbarui menjadi selesai.
+9. Sistem mengirim notifikasi kepada user terkait.
+10. Activity log mencatat aktivitas penting admin dan sistem.
+11. Admin dapat melihat dashboard dan analytics untuk monitoring laporan dan barang.
+12. Serah terima digunakan sebagai bukti proses pengembalian barang.
+
+## Catatan Keamanan dan Operasional
+
+- File `.env` tidak boleh di-commit.
+- Migration Alembic harus direview sebelum dijalankan.
+- Perubahan schema database harus dibuatkan migration baru.
+- Endpoint API tidak boleh diubah tanpa menyesuaikan service frontend yang memanggilnya.
+- Dokumentasi threat modeling tersedia di `docs/Threat_Modeling.pdf`.
