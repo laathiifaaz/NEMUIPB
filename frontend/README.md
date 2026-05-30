@@ -1,36 +1,88 @@
 # Frontend NEMU IPB
 
-Frontend NEMU IPB menggunakan React dan berkomunikasi dengan backend FastAPI melalui service di `src/services/`.
+Frontend NEMU IPB menggunakan React. Aplikasi ini menyediakan halaman civitas dan admin untuk laporan barang hilang/temuan, klaim barang, verifikasi, notifikasi, dashboard, analytics, dan koleksi barang.
 
-## Setup
+## Struktur Frontend
 
-```powershell
+```text
+frontend/
+|-- public/
+|-- src/
+|   |-- App.js
+|   |-- pages/
+|   |-- components/
+|   |-- services/
+|   |-- config/
+|   `-- utils/
+|-- package.json
+|-- package-lock.json
+`-- .env.example
+```
+
+## Install Dependency
+
+```bash
 cd frontend
 npm install
 ```
 
-## Menjalankan Frontend
+## Setup Environment
+
+Frontend membaca base URL backend dari `REACT_APP_API_BASE_URL` di `frontend/src/config/api.js`.
+
+Buat `.env` dari contoh jika perlu:
+
+Windows:
 
 ```powershell
+copy .env.example .env
+```
+
+Mac/Linux:
+
+```bash
+cp .env.example .env
+```
+
+Isi:
+
+```env
+REACT_APP_API_BASE_URL=http://localhost:8000
+```
+
+Jika `.env` tidak dibuat, frontend memakai default `http://127.0.0.1:8000`.
+
+## Menjalankan React
+
+```bash
 npm start
 ```
 
-Default URL backend dibaca dari `REACT_APP_API_BASE_URL`. Jika tidak diisi, frontend memakai `http://127.0.0.1:8000`.
+URL frontend:
 
-Untuk konfigurasi lokal:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Lalu sesuaikan:
-
-```text
-REACT_APP_API_BASE_URL=http://127.0.0.1:8000
-```
+- `http://localhost:3000`
 
 ## Build
 
-```powershell
+```bash
 npm run build
 ```
+
+## Hubungan ke Backend API
+
+Request API dikelola melalui file di `src/services/`, misalnya:
+
+- `AuthService.js`
+- `BarangService.js`
+- `ReportService.js`
+- `AdminService.js`
+- `NotifikasiService.js`
+
+Pastikan backend FastAPI sudah berjalan di URL yang sama dengan `REACT_APP_API_BASE_URL`.
+
+## Troubleshooting
+
+- Jika muncul `Failed to fetch`, pastikan backend berjalan.
+- Pastikan `REACT_APP_API_BASE_URL` mengarah ke backend, misalnya `http://localhost:8000`.
+- Setelah mengubah `.env`, restart `npm start`.
+- Jika dependency bermasalah, hapus `node_modules/` lalu jalankan ulang `npm install`.
