@@ -12,6 +12,7 @@ import KoleksiBarangPage from "./pages/KoleksiBarangPage.jsx";
 import UserManagementPage from "./pages/UserManagementPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticPage.jsx";
 import ClaimBarangPage from "./pages/ClaimBarangPage.jsx";
+import AdminPickupHistoryPage from "./pages/AdminPickupHistoryPage.jsx";
 
 import AuthService from "./services/AuthService";
 
@@ -144,6 +145,15 @@ class App extends Component {
       }
 
       return <AdminDashboardPage navigate={this.navigate} />;
+    }
+
+    // Riwayat serah terima admin
+    if (currentPath === "/admin/serah-terima") {
+      if (user.role !== "admin") {
+        return <DashboardPage navigate={this.navigate} />;
+      }
+
+      return <AdminPickupHistoryPage navigate={this.navigate} />;
     }
 
     // Verifikasi laporan

@@ -292,7 +292,7 @@ class DashboardPage extends Component {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-[#9A7D0A] mb-2">
-              Tempat Pengambilan Barang
+              Tempat Pengambilan & Penyerahan Barang
             </p>
             <h3 className="text-2xl font-extrabold text-[#002B5B] mb-2">
               Pos Keamanan Asrama IPB

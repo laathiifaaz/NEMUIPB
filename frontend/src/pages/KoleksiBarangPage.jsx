@@ -56,8 +56,19 @@ class KoleksiBarangPage extends Component {
   }
 
   async componentDidMount() {
+    window.addEventListener("storage", this.handleClaimStorageChange);
+    window.addEventListener("focus", this.handleClaimStorageChange);
     await this.fetchBarang();
   }
+
+  componentWillUnmount() {
+    window.removeEventListener("storage", this.handleClaimStorageChange);
+    window.removeEventListener("focus", this.handleClaimStorageChange);
+  }
+
+  handleClaimStorageChange = () => {
+    this.fetchBarang();
+  };
 
   toggleSidebar = () => {
     this.setState((prevState) => {
@@ -163,13 +174,16 @@ class KoleksiBarangPage extends Component {
 
   sortCollectionItems(items) {
     return [...items].sort((a, b) => {
-      const aAvailable =
-        a.status_barang === "ditemukan" && a.jenis_laporan === "penemuan";
-      const bAvailable =
-        b.status_barang === "ditemukan" && b.jenis_laporan === "penemuan";
+      const getJenisPriority = (item) => {
+        if (item.jenis_laporan === "penemuan") return 0;
+        if (item.jenis_laporan === "kehilangan") return 1;
+        return 2;
+      };
 
-      if (aAvailable !== bAvailable) {
-        return aAvailable ? -1 : 1;
+      const jenisDiff = getJenisPriority(a) - getJenisPriority(b);
+
+      if (jenisDiff !== 0) {
+        return jenisDiff;
       }
 
       return (
@@ -177,6 +191,31 @@ class KoleksiBarangPage extends Component {
         Number(a.laporan_id || a.barang_id || 0)
       );
     });
+  }
+
+  getDisplayStatus(item) {
+    if (item.status_laporan === "selesai" && item.jenis_laporan !== "penemuan") {
+      return "selesai";
+    }
+    if (item.status_laporan === "siap_diambil") return "diklaim";
+    return item.status_barang || "tidak diketahui";
+  }
+
+  getDisplayStatusClass(status) {
+    if (status === "hilang") return "bg-blue-500";
+    if (status === "ditemukan") return "bg-cyan-600";
+    if (status === "diklaim") return "bg-[#0B2B5B]";
+    if (status === "selesai") return "bg-green-600";
+    return "bg-yellow-500";
+  }
+
+  getDisplayDateLabel(item) {
+    if (item.status_laporan === "selesai" && item.jenis_laporan !== "penemuan") {
+      return "Selesai";
+    }
+    if (item.status_laporan === "siap_diambil") return "Diklaim";
+    if (item.status_barang === "hilang") return "Hilang";
+    return "Ditemukan";
   }
 
   getVisibleItems(items, keyword = this.state.searchKeyword) {
@@ -193,10 +232,13 @@ class KoleksiBarangPage extends Component {
     const pendingClaimedBarangIds = this.getPendingClaimedBarangIds();
 
     const visibleItems = this.getVerifiedItems(items).filter((item) => {
+      const claimStatus = (item.status_klaim || "").toLowerCase();
       const isClaimPending =
         item.status_barang === "diklaim" ||
         item.status_barang === "claim_pending" ||
+        claimStatus === "diproses" ||
         (
+          !claimStatus &&
           item.status_barang === "ditemukan" &&
           pendingClaimedBarangIds.has(String(item.barang_id))
         );
@@ -572,6 +614,7 @@ class KoleksiBarangPage extends Component {
                     {currentItems.map((item) => {
                       const normalizedItem = this.normalizeBarang(item);
                       const itemId = normalizedItem.id;
+                      const displayStatus = this.getDisplayStatus(normalizedItem);
 
                       return (
                         <div
@@ -589,15 +632,9 @@ class KoleksiBarangPage extends Component {
                             />
 
                             <div
-                              className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[8px] font-black text-white uppercase ${
-                                normalizedItem.status_barang === "hilang"
-                                  ? "bg-blue-500"
-                                  : normalizedItem.status_barang === "ditemukan"
-                                    ? "bg-cyan-600"
-                                    : "bg-yellow-500"
-                              }`}
+                              className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[8px] font-black text-white uppercase ${this.getDisplayStatusClass(displayStatus)}`}
                             >
-                              {normalizedItem.status_barang || "tidak diketahui"}
+                              {displayStatus}
                             </div>
                           </div>
 
@@ -618,9 +655,7 @@ class KoleksiBarangPage extends Component {
                             <div className="flex justify-between items-center border-t border-gray-50 pt-4 mt-auto gap-3">
                               <span className="text-[12px] text-gray-600 font-bold">
                                 <i className="far fa-calendar-alt text-yellow-600 mr-1"></i>
-                                {normalizedItem.status_barang === "hilang"
-                                  ? "Hilang"
-                                  : "Ditemukan"}
+                                {this.getDisplayDateLabel(normalizedItem)}
                                 : {normalizedItem.tanggal_kejadian || "-"}
                               </span>
 

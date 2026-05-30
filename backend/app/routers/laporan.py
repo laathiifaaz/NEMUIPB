@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.utils.security import get_current_user
 from app.database import SessionLocal
-from app.models import User, Barang, Laporan
+from app.models import User, Barang, Laporan, KlaimBarang
 from app.schemas import LaporanCreate
 from app.services.encryption.EncryptionService import encryption_service
 
@@ -24,6 +24,10 @@ def _build_user_report_response(laporan, barang):
         "status_verifikasi": laporan.status_verifikasi,
         "jenis_laporan": laporan.jenis_laporan,
         "status_barang": barang.status_barang,
+        "status_klaim": None,
+        "klaim_id": None,
+        "claim_barang_id": None,
+        "klaim_updated_time": None,
         "catatan_verifikasi": encryption_service.decrypt_if_exists(
             laporan.catatan_verifikasi
         )
@@ -182,7 +186,28 @@ def get_laporan_user(
         .all()
     )
 
-    result = [_build_user_report_response(laporan, barang) for laporan, barang in data]
+    claim_rows = (
+        db.query(KlaimBarang)
+        .filter(KlaimBarang.user_id == current_user.user_id)
+        .order_by(KlaimBarang.updated_time.desc().nullslast(), KlaimBarang.created_time.desc(), KlaimBarang.klaim_id.desc())
+        .all()
+    )
+    claim_map = {}
+    for claim in claim_rows:
+        key = claim.laporan_kehilangan_id
+        if key not in claim_map:
+            claim_map[key] = claim
+
+    result = []
+    for laporan, barang in data:
+        payload = _build_user_report_response(laporan, barang)
+        claim = claim_map.get(laporan.laporan_id)
+        if claim:
+            payload["status_klaim"] = claim.status_klaim
+            payload["klaim_id"] = claim.klaim_id
+            payload["claim_barang_id"] = claim.barang_id
+            payload["klaim_updated_time"] = claim.updated_time or claim.created_time
+        result.append(payload)
 
     db.close()
 

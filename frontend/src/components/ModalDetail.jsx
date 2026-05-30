@@ -1,8 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import AuthService from "../services/AuthService";
 
 const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setIsImagePreviewOpen(false);
+    setImageError(false);
+  }, [data]);
 
   const currentUser = AuthService.getCurrentUser();
   const currentUserId = currentUser?.user_id || currentUser?.id;
@@ -35,6 +41,9 @@ const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
 
     return `/images/${value}`;
   };
+
+  const imageSrc = getImageSrc(data);
+  const showImageFallback = imageError || !imageSrc;
 
   const formatTanggal = (dateString) => {
     if (!dateString) return "Okt 24, 2025";
@@ -98,8 +107,8 @@ const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
           <div
             className={`w-full bg-gray-50 flex items-center justify-center overflow-hidden ${
               compact
-                ? "md:w-[34%] h-52 md:h-auto"
-                : "md:w-[38%] min-h-[260px] md:min-h-[620px]"
+                ? "md:w-[35%] h-60 md:h-auto"
+                : "md:w-[39%] min-h-[300px] md:min-h-[660px]"
             }`}
           >
             <button
@@ -108,11 +117,30 @@ const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
               className="w-full h-full cursor-zoom-in"
               aria-label="Perbesar foto barang"
             >
-              <img
-                src={getImageSrc(data)}
-                alt={data.nama_barang || data.nama}
-                className="w-full h-full object-cover"
-              />
+              <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                {showImageFallback ? (
+                  <div className="w-full h-full bg-white flex flex-col items-center justify-center gap-3 text-center px-6 border border-gray-100">
+                    <div className="w-16 h-16 rounded-2xl bg-[#EEF4FF] text-[#163A70] flex items-center justify-center">
+                      <i className="fas fa-image text-2xl"></i>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#102348]">
+                        Foto tidak tersedia
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Tampilan detail tetap memakai ukuran yang sama.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={imageSrc}
+                    alt={data.nama_barang || data.nama}
+                    className="w-full h-full object-cover"
+                    onError={() => setImageError(true)}
+                  />
+                )}
+              </div>
             </button>
           </div>
 

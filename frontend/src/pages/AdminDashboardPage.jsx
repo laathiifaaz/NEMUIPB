@@ -37,6 +37,13 @@ class AdminDashboardPage extends Component {
       pickupLoading: false,
       pickupMessage: "",
       pickupError: "",
+      pickupHistory: this.getStoredPickupHistory(),
+      handoverDocument: null,
+      handoverVerification: null,
+      showHandoverModal: false,
+      handoverLoading: false,
+      handoverError: "",
+      showHandoverTechnicalDetails: false,
       isLoading: true,
       error: null,
       isSidebarExpanded: getStoredSidebarExpanded(),
@@ -100,6 +107,44 @@ class AdminDashboardPage extends Component {
     AuthService.logout();
     window.location.href = "/";
   };
+
+  getStoredPickupHistory() {
+    try {
+      return JSON.parse(
+        localStorage.getItem("nemuipb_admin_pickup_history") || "[]"
+      );
+    } catch (error) {
+      return [];
+    }
+  }
+
+  savePickupHistoryRecord(result, code) {
+    if (result.code_type !== "pickup" || !result.klaim_id) {
+      return this.state.pickupHistory;
+    }
+
+    const record = {
+      code,
+      code_type: result.code_type || "pickup",
+      message: result.message || "",
+      klaim_id: result.klaim_id,
+      barang_id: result.barang_id,
+      laporan_id: result.laporan_id,
+      status_barang: result.status_barang,
+      verified_at: new Date().toISOString(),
+    };
+    const nextHistory = [
+      record,
+      ...this.state.pickupHistory,
+    ].slice(0, 10);
+
+    localStorage.setItem(
+      "nemuipb_admin_pickup_history",
+      JSON.stringify(nextHistory)
+    );
+
+    return nextHistory;
+  }
 
   toggleFilterMenu = () => {
     this.setState({
@@ -221,6 +266,17 @@ class AdminDashboardPage extends Component {
     });
   };
 
+  closeHandoverModal = () => {
+    this.setState({
+      showHandoverModal: false,
+      handoverDocument: null,
+      handoverVerification: null,
+      handoverLoading: false,
+      handoverError: "",
+      showHandoverTechnicalDetails: false,
+    });
+  };
+
   handleVerifyPickup = async () => {
     const pickupCode = this.state.pickupCode.trim();
 
@@ -240,19 +296,56 @@ class AdminDashboardPage extends Component {
       });
 
       const result = await AdminService.verifyPickupCode(pickupCode);
+      const nextHistory = this.savePickupHistoryRecord(result, pickupCode);
 
       this.setState({
         pickupCode: "",
         pickupLoading: false,
         pickupMessage: result.message || "Kode pickup berhasil diverifikasi.",
         pickupError: "",
+        pickupHistory: nextHistory,
       });
+
+      if (result.code_type === "pickup" && result.klaim_id) {
+        this.setState({
+          handoverLoading: true,
+          handoverError: "",
+          showHandoverModal: true,
+          handoverDocument: null,
+          handoverVerification: null,
+          showHandoverTechnicalDetails: false,
+        });
+
+        try {
+          const [handoverDocument, handoverVerification] = await Promise.all([
+            AdminService.getSerahTerima(result.klaim_id),
+            AdminService.verifySerahTerima(result.klaim_id),
+          ]);
+
+          this.setState({
+            handoverDocument,
+            handoverVerification,
+            handoverLoading: false,
+          });
+        } catch (error) {
+          this.setState({
+            handoverLoading: false,
+            handoverError:
+              error.message || "Dokumen serah terima gagal dimuat.",
+          });
+        }
+      }
 
       await this.loadDashboardData();
     } catch (error) {
+      const pickupError =
+        error.message === "Failed to fetch"
+          ? "Gagal menghubungi server. Pastikan backend berjalan di http://127.0.0.1:8000 dan coba lagi."
+          : error.message || "Gagal memverifikasi kode pickup.";
+
       this.setState({
         pickupLoading: false,
-        pickupError: error.message || "Gagal memverifikasi kode pickup.",
+        pickupError,
         pickupMessage: "",
       });
     }
@@ -328,6 +421,18 @@ class AdminDashboardPage extends Component {
     return "bg-gray-100 text-gray-500";
   }
 
+  getReportTypeMeta(jenisLaporan) {
+    const isFound = jenisLaporan === "penemuan";
+
+    return {
+      label: isFound ? "Ditemukan" : "Hilang",
+      icon: isFound ? "fa-search-location" : "fa-exclamation-circle",
+      badgeClass: isFound
+        ? "bg-[#E8F7FA] text-[#006D8F] border-[#B9E7EF]"
+        : "bg-[#EEF4FF] text-[#163A70] border-[#CFE0F7]",
+    };
+  }
+
   renderChart() {
     return <ReportTrendChart data={this.state.monthlyTrends} heightClass="h-72" />;
   }
@@ -347,72 +452,152 @@ class AdminDashboardPage extends Component {
     if (!this.state.showDetailModal || !report) return null;
 
     const isDisabled = this.isFinalStatus(report);
+    const reportType = this.getReportTypeMeta(report.jenis_laporan);
+    const reportDateLabel =
+      report.jenis_laporan === "penemuan"
+        ? "Tanggal Penemuan"
+        : "Tanggal Kehilangan";
+    const submittedDate = report.created_time
+      ? new Date(report.created_time).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : "-";
 
     return (
-      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-6">
-        <div className="bg-white rounded-[24px] w-full max-w-5xl p-5 md:p-6 relative max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-4">
+        <div className="bg-white rounded-[24px] w-full max-w-[940px] relative max-h-[calc(100vh-32px)] overflow-hidden shadow-2xl">
           <button
             type="button"
             onClick={this.handleCloseDetail}
-            className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+            className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white/95 border border-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm"
+            aria-label="Tutup detail laporan"
           >
-            <i className="fas fa-times"></i>
+            x
           </button>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-            <div>
-              <div className="relative rounded-[25px] overflow-hidden bg-gray-100">
+          <div className="flex flex-col md:flex-row max-h-[calc(100vh-32px)] overflow-hidden">
+            <div className="w-full md:w-[34%] bg-gray-50 flex items-center justify-center overflow-hidden h-52 md:h-auto">
+              <div className="relative w-full h-full">
                 <span className="absolute top-4 left-4 bg-[#006D8F] text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase">
-                  {report.status_barang}
+                  {report.status_barang || "status"}
                 </span>
 
                 <img
                   src={this.getImageSrc(report.dokumentasi)}
-                  alt={report.item_name}
-                  className="w-full h-72 object-cover"
+                  alt={report.item_name || report.nama_barang}
+                  className="w-full h-full object-cover"
                 />
               </div>
             </div>
 
-            <div className="md:col-span-2 md:pr-12">
-              <div className="flex justify-between items-start mb-4">
+            <div className="flex-1 p-5 pr-14 md:p-7 md:pr-16 flex flex-col gap-3 min-w-0 overflow-y-auto">
+              <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-start">
                 <div>
                   <p className="text-[#9A7D0A] text-xs font-black uppercase tracking-widest">
                     {report.kategori || "Kategori"}
                   </p>
 
-                  <h2 className="text-3xl font-extrabold text-[#002B5B]">
-                    {report.item_name}
+                  <h2 className="text-2xl font-extrabold text-[#002B5B] leading-tight">
+                    {report.item_name || report.nama_barang}
                   </h2>
                 </div>
 
-                <div className="text-right">
+                <div className="md:text-right">
                   <p className="text-gray-400 text-xs font-black uppercase">
-                    Dilaporkan
+                    {reportDateLabel}
                   </p>
+
                   <p className="text-[#002B5B] font-semibold">
-                    {report.tanggal_kejadian}
+                    {report.tanggal_kejadian || "-"}
                   </p>
                 </div>
               </div>
 
-              <p className="text-gray-500 text-sm leading-relaxed mb-6">
+              <p className="text-gray-500 text-sm leading-relaxed">
                 {report.deskripsi || "Tidak ada deskripsi."}
               </p>
 
-              <div className="flex flex-wrap gap-4 mb-8">
-                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+              <div className="flex flex-wrap gap-2">
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700">
                   <i className="fas fa-map-marker-alt mr-2 text-[#002B5B]"></i>
-                  {report.lokasi}
+                  {report.lokasi || "-"}
                 </div>
 
-                <div className="bg-gray-100 px-5 py-3 rounded-xl text-sm font-bold text-gray-700">
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700">
                   <i className="fas fa-user mr-2 text-[#002B5B]"></i>
-                  {report.reporter}
+                  {report.reporter || report.pelapor || "-"}
+                </div>
+
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700">
+                  <i className="fas fa-envelope mr-2 text-[#002B5B]"></i>
+                  {report.email || "-"}
+                </div>
+
+                <div className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-700 capitalize">
+                  <i className="fas fa-clipboard-list mr-2 text-[#002B5B]"></i>
+                  {report.jenis_laporan || "-"}
                 </div>
               </div>
 
-              <div className="flex justify-between items-center">
+              <div className="bg-[#F8FAFC] border border-[#E7ECF3] rounded-2xl p-3">
+                <div className="flex flex-wrap gap-2">
+                  <div className="bg-white border border-[#E7ECF3] px-3 py-2 rounded-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                      Jenis Laporan
+                    </p>
+                    <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-black ${reportType.badgeClass}`}>
+                      <i className={`fas ${reportType.icon}`}></i>
+                      {reportType.label}
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-[#E7ECF3] px-3 py-2 rounded-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                      {reportDateLabel}
+                    </p>
+                    <p className="text-sm font-bold text-[#002B5B]">
+                      {report.tanggal_kejadian || "-"}
+                    </p>
+                  </div>
+
+                  <div className="bg-white border border-[#E7ECF3] px-3 py-2 rounded-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                      Tanggal Dilaporkan
+                    </p>
+                    <p className="text-sm font-bold text-[#002B5B]">
+                      {submittedDate}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {report.catatan_verifikasi && (
+                <div
+                  className={`border rounded-2xl p-3 ${
+                    report.status_verifikasi === "terverifikasi"
+                      ? "bg-[#EEFDF3] border-green-100"
+                      : "bg-[#FFF7F7] border-red-100"
+                  }`}
+                >
+                  <p
+                    className={`text-xs font-bold mb-1 ${
+                      report.status_verifikasi === "terverifikasi"
+                        ? "text-[#0F9F4B]"
+                        : "text-red-500"
+                    }`}
+                  >
+                    Catatan Verifikasi
+                  </p>
+
+                  <p className="text-sm text-gray-600">
+                    {report.catatan_verifikasi}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center border-t border-gray-50 pt-4 mt-auto">
                 <p className="text-xs text-gray-400 font-bold">
                   ID: #IPB-{report.laporan_id}
                 </p>
@@ -420,26 +605,26 @@ class AdminDashboardPage extends Component {
                 <div className="flex gap-3">
                   <button
                     disabled={isDisabled}
-                    onClick={() => this.openVerifyConfirm(report.laporan_id)}
-                    className={`px-6 py-3 rounded-lg text-xs font-bold ${
+                    onClick={() => this.openDenyConfirm(report.laporan_id)}
+                    className={`px-5 py-3 rounded-xl text-xs font-bold transition-all ${
                       isDisabled
-                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                        : "bg-[#002B5B] text-white"
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-red-50 text-red-600 hover:bg-red-100"
                     }`}
                   >
-                    Setujui
+                    Tolak
                   </button>
 
                   <button
                     disabled={isDisabled}
-                    onClick={() => this.openDenyConfirm(report.laporan_id)}
-                    className={`px-6 py-3 rounded-lg text-xs font-bold ${
+                    onClick={() => this.openVerifyConfirm(report.laporan_id)}
+                    className={`px-5 py-3 rounded-xl text-xs font-bold transition-all ${
                       isDisabled
-                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                        : "bg-red-600 text-white"
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-[#163A70] text-white hover:bg-[#102348]"
                     }`}
                   >
-                    Tolak
+                    Setujui
                   </button>
                 </div>
               </div>
@@ -506,8 +691,171 @@ class AdminDashboardPage extends Component {
   );
 }
 
+  renderHandoverModal() {
+    const {
+      showHandoverModal,
+      handoverDocument,
+      handoverVerification,
+      handoverLoading,
+      handoverError,
+      showHandoverTechnicalDetails,
+    } = this.state;
+
+    if (!showHandoverModal) return null;
+
+    const signatureValid = handoverVerification?.valid;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-6">
+        <div className="bg-white rounded-[28px] w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="sticky top-0 bg-white border-b border-[#EEF2F6] px-6 py-5 flex items-center justify-between rounded-t-[28px]">
+            <div>
+              <h2 className="text-2xl font-extrabold text-[#102348]">
+                Dokumen Serah Terima
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Dokumen dibuat setelah kode pickup berhasil diverifikasi.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={this.closeHandoverModal}
+              className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+              aria-label="Tutup dokumen serah terima"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+          </div>
+
+          {handoverLoading ? (
+            <div className="p-10 text-center text-gray-400 font-semibold">
+              Memuat dan memverifikasi dokumen serah terima...
+            </div>
+          ) : handoverError ? (
+            <div className="p-6">
+              <div className="rounded-2xl bg-red-50 border border-red-100 text-red-600 px-5 py-4 text-sm font-bold">
+                {handoverError}
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 space-y-5">
+              <div
+                className={`rounded-2xl px-5 py-4 border ${
+                  signatureValid
+                    ? "bg-[#EEFDF3] border-green-100 text-[#0F9F4B]"
+                    : "bg-red-50 border-red-100 text-red-600"
+                }`}
+              >
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest mb-1">
+                      Status Tanda Tangan
+                    </p>
+                    <h3 className="text-lg font-extrabold">
+                      {handoverVerification?.message || "Belum diverifikasi"}
+                    </h3>
+                  </div>
+
+                  <div className="flex gap-2 text-xs font-black">
+                    <span className="bg-white/80 px-3 py-2 rounded-xl">
+                      Hash: {handoverVerification?.hash_valid ? "Valid" : "Tidak valid"}
+                    </span>
+                    <span className="bg-white/80 px-3 py-2 rounded-xl">
+                      Tanda tangan: {handoverVerification?.signature_valid ? "Valid" : "Tidak valid"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 bg-[#F8FAFC] rounded-2xl border border-[#E7ECF3] p-5">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
+                    Dokumen Serah Terima
+                  </p>
+                  <pre className="whitespace-pre-wrap text-sm text-gray-600 leading-relaxed">
+                    {handoverDocument?.dokumen_text || "-"}
+                  </pre>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      Klaim
+                    </p>
+                    <p className="text-sm font-bold text-[#102348]">
+                      Klaim #{handoverDocument?.klaim_id || "-"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Serah Terima #{handoverDocument?.serah_terima_id || "-"}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      this.setState((prevState) => ({
+                        showHandoverTechnicalDetails:
+                          !prevState.showHandoverTechnicalDetails,
+                      }))
+                    }
+                    className="w-full rounded-2xl border border-[#D6E2F0] px-4 py-3 text-xs font-black text-[#163A70] hover:bg-[#F5F7FB] transition-all"
+                  >
+                    {showHandoverTechnicalDetails
+                      ? "Sembunyikan Detail Teknis"
+                      : "Lihat Detail Teknis"}
+                  </button>
+
+                  {showHandoverTechnicalDetails && (
+                    <div className="space-y-4">
+                      <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                          Hash Dokumen
+                        </p>
+                        <p className="break-all text-xs font-bold text-[#2563EB] leading-relaxed">
+                          {handoverDocument?.dokumen_hash || "-"}
+                        </p>
+                      </div>
+
+                      <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                          Tanda Tangan Digital
+                        </p>
+                        <p className="break-all text-[10px] text-gray-500 leading-relaxed max-h-28 overflow-y-auto">
+                          {handoverDocument?.digital_signature || "-"}
+                        </p>
+                      </div>
+
+                      <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                          Kunci Publik
+                        </p>
+                        <pre className="whitespace-pre-wrap break-all text-[10px] text-gray-500 leading-relaxed max-h-32 overflow-y-auto">
+                          {handoverDocument?.public_key || "-"}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   render() {
-    const { reports, summary, error, isLoading, pickupCode, pickupLoading, pickupMessage, pickupError } = this.state;
+    const {
+      reports,
+      summary,
+      error,
+      isLoading,
+      pickupCode,
+      pickupLoading,
+      pickupMessage,
+      pickupError,
+    } = this.state;
 
     return (
       <div className="min-h-screen bg-[#F6F7FB] font-['Plus_Jakarta_Sans'] text-[#002B5B]">
@@ -614,8 +962,22 @@ class AdminDashboardPage extends Component {
 
               <div className="bg-[#002B5B] text-white rounded-[30px] p-8 shadow-sm flex flex-col justify-between">
                 <div>
-                  <div className="w-12 h-12 bg-white text-[#002B5B] rounded-xl flex items-center justify-center mb-6">
-                    <i className="fas fa-certificate"></i>
+                  <div className="flex items-start justify-between gap-4 mb-6">
+                    <div className="w-12 h-12 bg-white text-[#002B5B] rounded-xl flex items-center justify-center flex-shrink-0">
+                      <i className="fas fa-certificate"></i>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        this.props.navigate
+                          ? this.props.navigate("/admin/serah-terima")
+                          : (window.location.href = "/admin/serah-terima")
+                      }
+                      className="shrink-0 border border-white/20 text-white/80 px-4 py-2 rounded-xl text-xs font-black tracking-widest hover:bg-white/10 transition-all"
+                    >
+                      RIWAYAT SERAH TERIMA
+                    </button>
                   </div>
 
                   <h3 className="text-2xl font-medium leading-tight mb-3">
@@ -658,6 +1020,7 @@ class AdminDashboardPage extends Component {
                 >
                   {pickupLoading ? "MEMVERIFIKASI..." : "VERIFIKASI KODE"}
                 </button>
+
               </div>
             </section>
 
@@ -765,20 +1128,6 @@ class AdminDashboardPage extends Component {
                               <button
                                 disabled={disabled}
                                 onClick={() =>
-                                  this.openVerifyConfirm(report.laporan_id)
-                                }
-                                className={`px-4 py-2 rounded-lg text-xs font-bold mr-2 ${
-                                  disabled
-                                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                    : "bg-[#002B5B] text-white"
-                                }`}
-                              >
-                                Setujui 
-                              </button>
-
-                              <button
-                                disabled={disabled}
-                                onClick={() =>
                                   this.openDenyConfirm(report.laporan_id)
                                 }
                                 className={`px-4 py-2 rounded-lg text-xs font-bold mr-2 ${
@@ -788,6 +1137,20 @@ class AdminDashboardPage extends Component {
                                 }`}
                               >
                                 Tolak
+                              </button>
+
+                              <button
+                                disabled={disabled}
+                                onClick={() =>
+                                  this.openVerifyConfirm(report.laporan_id)
+                                }
+                                className={`px-4 py-2 rounded-lg text-xs font-bold mr-2 ${
+                                  disabled
+                                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                    : "bg-[#002B5B] text-white"
+                                }`}
+                              >
+                                Setujui 
                               </button>
 
                               <button
@@ -813,6 +1176,7 @@ class AdminDashboardPage extends Component {
           </main>
             {this.renderDetailModal()}
             {this.renderConfirmModal()}
+            {this.renderHandoverModal()}
         </div>
       </div>
     );

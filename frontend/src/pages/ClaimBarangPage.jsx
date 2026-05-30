@@ -27,8 +27,19 @@ class ClaimBarangPage extends Component {
   }
 
   async componentDidMount() {
+    window.addEventListener("storage", this.handleClaimStorageChange);
+    window.addEventListener("focus", this.handleClaimStorageChange);
     await this.loadClaimData();
   }
+
+  componentWillUnmount() {
+    window.removeEventListener("storage", this.handleClaimStorageChange);
+    window.removeEventListener("focus", this.handleClaimStorageChange);
+  }
+
+  handleClaimStorageChange = () => {
+    this.loadClaimData();
+  };
 
   toggleSidebar = () => {
     this.setState((prevState) => {
@@ -121,21 +132,61 @@ class ClaimBarangPage extends Component {
           report.status_laporan === "disetujui" &&
           report.status_verifikasi === "terverifikasi"
       );
+      const backendClaimReport = (Array.isArray(reports) ? reports : []).find(
+        (report) =>
+          String(report.claim_barang_id) === String(barangId) &&
+          ["diproses", "diterima", "ditolak"].includes(
+            (report.status_klaim || "").toLowerCase()
+          )
+      );
+
       const storedClaims = JSON.parse(
         localStorage.getItem("nemuipb_claim_status") || "{}"
       );
-      const submittedClaimEntry = Object.entries(storedClaims).find(
-        ([, claim]) =>
-          String(claim?.barang_id) === String(barangId) &&
-          claim?.status_klaim !== "dibatalkan"
-      );
-      const submittedClaim = submittedClaimEntry
-        ? {
-            laporan_id:
-              submittedClaimEntry[1].laporan_id || submittedClaimEntry[0],
-            ...submittedClaimEntry[1],
-          }
-        : null;
+
+      let submittedClaim = null;
+      let successMessage = "";
+
+      if (backendClaimReport) {
+        const backendClaimStatus = (backendClaimReport.status_klaim || "").toLowerCase();
+
+        storedClaims[backendClaimReport.laporan_id] = {
+          barang_id: barangId,
+          laporan_id: backendClaimReport.laporan_id,
+          klaim_id: backendClaimReport.klaim_id,
+          status_klaim: backendClaimStatus,
+          updated_at: backendClaimReport.klaim_updated_time || new Date().toISOString(),
+        };
+        localStorage.setItem(
+          "nemuipb_claim_status",
+          JSON.stringify(storedClaims)
+        );
+
+        if (backendClaimStatus === "diproses" || backendClaimStatus === "diterima") {
+          submittedClaim = storedClaims[backendClaimReport.laporan_id];
+          successMessage = "Klaim barang berhasil diajukan";
+        } else if (backendClaimStatus === "ditolak") {
+          successMessage = "Klaim sebelumnya ditolak. Kamu bisa mengajukan ulang.";
+        }
+      } else {
+        const submittedClaimEntry = Object.entries(storedClaims).find(
+          ([, claim]) =>
+            String(claim?.barang_id) === String(barangId) &&
+            claim?.status_klaim !== "dibatalkan" &&
+            claim?.status_klaim !== "ditolak"
+        );
+        submittedClaim = submittedClaimEntry
+          ? {
+              laporan_id:
+                submittedClaimEntry[1].laporan_id || submittedClaimEntry[0],
+              ...submittedClaimEntry[1],
+            }
+          : null;
+
+        if (submittedClaim) {
+          successMessage = "Klaim barang berhasil diajukan";
+        }
+      }
 
       this.setState({
         barang,
@@ -147,9 +198,7 @@ class ClaimBarangPage extends Component {
             ? String(availableReports[0].laporan_id)
             : "",
         submittedClaim,
-        successMessage: submittedClaim
-          ? "Klaim barang berhasil diajukan"
-          : "",
+        successMessage,
         loading: false,
       });
     } catch (error) {

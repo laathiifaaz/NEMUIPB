@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy import or_
 
 from app.database import SessionLocal
-from app.models import Barang, Laporan
+from app.models import Barang, Laporan, KlaimBarang
 
 router = APIRouter(
     prefix="/barang",
@@ -22,6 +22,21 @@ def get_all_barang():
         .all()
     )
 
+    claim_rows = (
+        db.query(KlaimBarang)
+        .order_by(
+            KlaimBarang.updated_time.desc().nullslast(),
+            KlaimBarang.created_time.desc(),
+            KlaimBarang.klaim_id.desc(),
+        )
+        .all()
+    )
+    claim_map = {}
+    for claim in claim_rows:
+        key = claim.barang_id
+        if key not in claim_map:
+            claim_map[key] = claim
+
     barang = [
         {
             "barang_id": item.barang_id,
@@ -30,6 +45,8 @@ def get_all_barang():
             "jenis_laporan": laporan.jenis_laporan if laporan else None,
             "status_laporan": laporan.status_laporan if laporan else None,
             "status_verifikasi": laporan.status_verifikasi if laporan else None,
+            "status_klaim": claim_map.get(item.barang_id).status_klaim if claim_map.get(item.barang_id) else None,
+            "klaim_id": claim_map.get(item.barang_id).klaim_id if claim_map.get(item.barang_id) else None,
             "nama_barang": item.nama_barang,
             "kategori": item.kategori,
             "deskripsi": item.deskripsi,

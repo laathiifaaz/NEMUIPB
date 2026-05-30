@@ -7,6 +7,7 @@ class AdminSidebar extends Component {
 
     this.state = {
       hoverExpanded: false,
+      verificationOpen: false,
     };
   }
 
@@ -22,6 +23,17 @@ class AdminSidebar extends Component {
       navigate(path);
     }
   }
+
+  toggleVerificationMenu = () => {
+    if (!this.getExpanded()) {
+      this.handleNavigate("/admin/verifikasi");
+      return;
+    }
+
+    this.setState((prevState) => ({
+      verificationOpen: !prevState.verificationOpen,
+    }));
+  };
 
   renderItem(icon, label, activeKey, path) {
     const { activeMenu } = this.props;
@@ -81,6 +93,107 @@ class AdminSidebar extends Component {
 
   getExpanded() {
     return Boolean(this.props.expanded || this.state.hoverExpanded);
+  }
+
+  renderVerificationMenu() {
+    const { activeMenu } = this.props;
+    const expanded = this.getExpanded();
+    const isActive = activeMenu === "verification";
+    const activeView =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("view") || "laporan"
+        : "laporan";
+    const isOpen = expanded && (this.state.verificationOpen || isActive);
+
+    const subItems = [
+      { label: "Laporan", view: "laporan", path: "/admin/verifikasi?view=laporan" },
+      { label: "Klaim Barang", view: "klaim", path: "/admin/verifikasi?view=klaim" },
+    ];
+
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={this.toggleVerificationMenu}
+          className={`
+            flex
+            items-center
+            ${expanded ? "justify-between" : "justify-center"}
+            h-14
+            w-full
+            ${expanded ? "px-4" : "px-0"}
+            rounded-2xl
+            cursor-pointer
+            relative
+            overflow-hidden
+            transition-colors duration-200
+            ${
+              isActive
+                ? "bg-[#163A70] text-white shadow-sm"
+                : "text-gray-500 hover:bg-[#EEF4FB] hover:text-[#002B5B]"
+            }
+          `}
+        >
+          <div
+            className={`flex items-center ${
+              expanded ? "" : "justify-center w-full"
+            }`}
+          >
+            <div className="w-5 flex justify-center flex-shrink-0">
+              <i className="fas fa-check-circle"></i>
+            </div>
+
+            <span
+              className={`
+                font-bold
+                text-sm
+                whitespace-nowrap
+                overflow-hidden
+                ${
+                  expanded
+                    ? "ml-4 max-w-40 opacity-100"
+                    : "ml-0 max-w-0 opacity-0"
+                }
+                transition-all duration-150
+              `}
+            >
+              Verifikasi
+            </span>
+          </div>
+
+          {expanded && (
+            <i
+              className={`fas fa-chevron-down text-[10px] transition-transform ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            ></i>
+          )}
+        </button>
+
+        {isOpen && (
+          <div className="mt-2 ml-9 flex flex-col gap-2">
+            {subItems.map((item) => {
+              const isSubActive = activeView === item.view;
+
+              return (
+                <button
+                  key={item.view}
+                  type="button"
+                  onClick={() => this.handleNavigate(item.path)}
+                  className={`text-left rounded-xl px-4 py-3 min-h-11 text-sm font-bold leading-tight transition-colors ${
+                    isSubActive
+                      ? "bg-[#EAF2FF] text-[#163A70]"
+                      : "text-gray-500 hover:bg-[#F5F7FB] hover:text-[#163A70]"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   }
 
   render() {
@@ -151,12 +264,7 @@ class AdminSidebar extends Component {
             "/admin/barang"
           )}
 
-          {this.renderItem(
-            "fa-check-circle",
-            "Verifikasi",
-            "verification",
-            "/admin/verifikasi"
-          )}
+          {this.renderVerificationMenu()}
 
           {this.renderItem(
             "fa-chart-bar",
