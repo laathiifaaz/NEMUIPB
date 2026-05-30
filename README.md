@@ -16,11 +16,7 @@ NEMUIPB/
 │  ├─ public/
 │  ├─ src/
 │  ├─ package.json
-│  └─ .env.example
-├─ docs/                 # Dokumentasi teknis
-│  ├─ Threat_Modeling.pdf
-│  └─ architecture.md
-├─ tools/                # Script pendukung repository
+│  └─ .env.example             
 ├─ .gitignore
 └─ README.md
 ```
