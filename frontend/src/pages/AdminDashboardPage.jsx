@@ -339,7 +339,7 @@ class AdminDashboardPage extends Component {
     } catch (error) {
       const pickupError =
         error.message === "Failed to fetch"
-          ? "Gagal menghubungi server. Pastikan backend berjalan di http://127.0.0.1:8000 dan coba lagi."
+          ? "Gagal menghubungi server. Pastikan koneksi backend tersedia, lalu coba lagi."
           : error.message || "Gagal memverifikasi kode pickup.";
 
       this.setState({

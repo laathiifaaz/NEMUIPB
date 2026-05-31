@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+import { API_BASE_URL } from "../config/api";
 import AdminSidebar from "../components/admin/AdminSidebar";
 import PageHeader from "../components/PageHeader";
 import PageFooter from "../components/PageFooter";
@@ -218,7 +219,7 @@ class AdminVerificationPage extends Component {
       const token = localStorage.getItem("access_token");
 
       const response = await fetch(
-        "http://127.0.0.1:8000/admin/laporan",
+        `${API_BASE_URL}/admin/laporan`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -547,7 +548,7 @@ class AdminVerificationPage extends Component {
 
       const message =
         error.message === "Failed to fetch"
-          ? "Gagal menghubungi server. Pastikan backend berjalan di http://127.0.0.1:8000, lalu coba lagi."
+          ? "Gagal menghubungi server. Pastikan koneksi backend tersedia, lalu coba lagi."
           : error.message || "Gagal memverifikasi klaim";
 
       this.showPopup(
@@ -821,7 +822,7 @@ class AdminVerificationPage extends Component {
       const token = localStorage.getItem("access_token");
 
       const response = await fetch(
-        `http://127.0.0.1:8000/admin/laporan/${id}/setujui`,
+        `${API_BASE_URL}/admin/laporan/${id}/setujui`,
         {
           method: "PATCH",
           headers: {
@@ -897,7 +898,7 @@ class AdminVerificationPage extends Component {
       const token = localStorage.getItem("access_token");
 
       const response = await fetch(
-        `http://127.0.0.1:8000/admin/laporan/${selectedReportId}/tolak`,
+        `${API_BASE_URL}/admin/laporan/${selectedReportId}/tolak`,
         {
           method: "PATCH",
           headers: {
