@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+import { API_BASE_URL } from "../config/api";
 import AuthService from "../services/AuthService";
 import BarangService from "../services/BarangService";
 import ModalDetail from "../components/ModalDetail";

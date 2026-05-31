@@ -1,6 +1,5 @@
-
-
 import React, { Component } from 'react';
+import { API_BASE_URL } from "../config/api";
 import AuthService from '../services/AuthService';
 import UserPageLayout from '../components/UserPageLayout';
 import BarangService from "../services/BarangService";
