@@ -8,6 +8,10 @@ from app.routers import auth, barang, laporan, admin, notifikasi, klaim, serah_t
 
 app = FastAPI()
 
+origins = [
+    "https://nemuipb.vercel.app/",
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
