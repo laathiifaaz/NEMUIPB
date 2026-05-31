@@ -29,8 +29,6 @@ NEMUIPB/
 |   |-- package.json
 |   |-- package-lock.json
 |   `-- .env.example                 # Contoh environment frontend
-|-- docs/                            # Dokumentasi teknis
-|-- tools/                           # Script pendukung repository
 |-- .gitignore
 `-- README.md
 ```
