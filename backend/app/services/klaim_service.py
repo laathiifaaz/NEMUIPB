@@ -112,13 +112,16 @@ class KlaimService:
                 "Barang belum tersedia untuk diklaim"
             )
 
-        duplicate_claim = self.db.query(KlaimBarang).filter(
+        existing_claim = self.db.query(KlaimBarang).filter(
             KlaimBarang.user_id == user.user_id,
-            KlaimBarang.barang_id == barang_id,
-            KlaimBarang.status_klaim.in_(KlaimDomain.active_statuses())
+            KlaimBarang.barang_id == barang_id
+        ).order_by(
+            KlaimBarang.updated_time.desc().nullslast(),
+            KlaimBarang.created_time.desc(),
+            KlaimBarang.klaim_id.desc()
         ).first()
 
-        if duplicate_claim:
+        if existing_claim and existing_claim.status_klaim in KlaimDomain.active_statuses():
             raise KlaimServiceError(
                 400,
                 "Anda sudah pernah mengklaim barang ini"
@@ -136,21 +139,30 @@ class KlaimService:
                 "Laporan kehilangan ini sedang dipakai atau sudah diterima untuk klaim lain"
             )
 
-        claim = KlaimBarang(
-            user_id=user.user_id,
-            barang_id=barang_id,
-            laporan_kehilangan_id=laporan_kehilangan_id,
-            status_klaim=KlaimDomain.PENDING
-        )
+        if existing_claim:
+            claim = existing_claim
+            claim.laporan_kehilangan_id = laporan_kehilangan_id
+            claim.status_klaim = KlaimDomain.PENDING
+            claim.catatan_admin = None
+            claim.updated_time = datetime.now()
+        else:
+            claim = KlaimBarang(
+                user_id=user.user_id,
+                barang_id=barang_id,
+                laporan_kehilangan_id=laporan_kehilangan_id,
+                status_klaim=KlaimDomain.PENDING,
+                updated_time=datetime.now()
+            )
+            self.db.add(claim)
 
-        self.db.add(claim)
         self.db.commit()
         self.db.refresh(claim)
 
         return {
             "message": "Klaim barang berhasil diajukan",
             "klaim_id": claim.klaim_id,
-            "status_klaim": KlaimDomain.PENDING
+            "status_klaim": KlaimDomain.PENDING,
+            "updated_time": claim.updated_time
         }
 
     def cancel_claim(self, klaim_id, user):
@@ -307,8 +319,8 @@ class KlaimService:
 
         return (
             f"Klaim barang Anda diterima. Kode pickup Anda: {pickup_code}. "
-            "Tunjukkan kode ini ke admin saat mengambil barang di Pos Keamanan "
-            "Asrama IPB, Senin-Jumat 08.00-17.00 WIB."
+            "Tunjukkan kode ini ke admin saat mengambil barang di Kantor Pusat "
+            "NEMU IPB, Senin-Jumat 08.00-17.00 WIB."
         )
 
     def build_dropoff_note(self, dropoff_code, catatan_admin):

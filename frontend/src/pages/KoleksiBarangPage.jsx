@@ -175,15 +175,36 @@ class KoleksiBarangPage extends Component {
   sortCollectionItems(items) {
     return [...items].sort((a, b) => {
       const getJenisPriority = (item) => {
+        if (item.status_barang === "ditemukan") return 0;
+        if (item.status_barang === "hilang") return 1;
         if (item.jenis_laporan === "penemuan") return 0;
         if (item.jenis_laporan === "kehilangan") return 1;
-        return 2;
+        if (item.status_barang === "diklaim") return 2;
+        return 3;
+      };
+
+      const getSortDate = (item) => {
+        const rawDate =
+          item.tanggal_kejadian ||
+          item.updated_at ||
+          item.created_time ||
+          item.created_at ||
+          "";
+        const timestamp = new Date(rawDate).getTime();
+
+        return Number.isNaN(timestamp) ? 0 : timestamp;
       };
 
       const jenisDiff = getJenisPriority(a) - getJenisPriority(b);
 
       if (jenisDiff !== 0) {
         return jenisDiff;
+      }
+
+      const dateDiff = getSortDate(b) - getSortDate(a);
+
+      if (dateDiff !== 0) {
+        return dateDiff;
       }
 
       return (
@@ -210,12 +231,17 @@ class KoleksiBarangPage extends Component {
   }
 
   getDisplayDateLabel(item) {
-    if (item.status_laporan === "selesai" && item.jenis_laporan !== "penemuan") {
-      return "Selesai";
+    if (item.jenis_laporan === "penemuan") {
+      return "Penemuan";
     }
+
+    if (item.jenis_laporan === "kehilangan") {
+      return "Hilang";
+    }
+
     if (item.status_laporan === "siap_diambil") return "Diklaim";
     if (item.status_barang === "hilang") return "Hilang";
-    return "Ditemukan";
+    return "Tanggal";
   }
 
   getVisibleItems(items, keyword = this.state.searchKeyword) {
@@ -632,7 +658,7 @@ class KoleksiBarangPage extends Component {
                             />
 
                             <div
-                              className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[8px] font-black text-white uppercase ${this.getDisplayStatusClass(displayStatus)}`}
+                              className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[8px] font-black text-white uppercase shadow-lg shadow-black/10 ${this.getDisplayStatusClass(displayStatus)}`}
                             >
                               {displayStatus}
                             </div>

@@ -33,6 +33,8 @@ class AdminDashboardPage extends Component {
       },
       selectedFilter: "semua",
       showFilterMenu: false,
+      dashboardCurrentPage: 1,
+      dashboardReportsPerPage: 10,
       pickupCode: "",
       pickupLoading: false,
       pickupMessage: "",
@@ -84,6 +86,7 @@ class AdminDashboardPage extends Component {
         summary,
         monthlyTrends: analytics.monthlyTrends || [],
         reports: this.getDashboardReports(reports),
+        dashboardCurrentPage: 1,
         isLoading: false,
         error: null,
       });
@@ -158,6 +161,7 @@ class AdminDashboardPage extends Component {
         selectedFilter: filterValue,
         showFilterMenu: false,
         isLoading: true,
+        dashboardCurrentPage: 1,
       },
       async () => {
         await this.loadDashboardData();
@@ -169,6 +173,12 @@ class AdminDashboardPage extends Component {
     this.setState({
       selectedReport: report,
       showDetailModal: true,
+    });
+  };
+
+  setDashboardPage = (page) => {
+    this.setState({
+      dashboardCurrentPage: page,
     });
   };
 
@@ -698,7 +708,6 @@ class AdminDashboardPage extends Component {
       handoverVerification,
       handoverLoading,
       handoverError,
-      showHandoverTechnicalDetails,
     } = this.state;
 
     if (!showHandoverModal) return null;
@@ -791,51 +800,6 @@ class AdminDashboardPage extends Component {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      this.setState((prevState) => ({
-                        showHandoverTechnicalDetails:
-                          !prevState.showHandoverTechnicalDetails,
-                      }))
-                    }
-                    className="w-full rounded-2xl border border-[#D6E2F0] px-4 py-3 text-xs font-black text-[#163A70] hover:bg-[#F5F7FB] transition-all"
-                  >
-                    {showHandoverTechnicalDetails
-                      ? "Sembunyikan Detail Teknis"
-                      : "Lihat Detail Teknis"}
-                  </button>
-
-                  {showHandoverTechnicalDetails && (
-                    <div className="space-y-4">
-                      <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                          Hash Dokumen
-                        </p>
-                        <p className="break-all text-xs font-bold text-[#2563EB] leading-relaxed">
-                          {handoverDocument?.dokumen_hash || "-"}
-                        </p>
-                      </div>
-
-                      <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                          Tanda Tangan Digital
-                        </p>
-                        <p className="break-all text-[10px] text-gray-500 leading-relaxed max-h-28 overflow-y-auto">
-                          {handoverDocument?.digital_signature || "-"}
-                        </p>
-                      </div>
-
-                      <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                          Kunci Publik
-                        </p>
-                        <pre className="whitespace-pre-wrap break-all text-[10px] text-gray-500 leading-relaxed max-h-32 overflow-y-auto">
-                          {handoverDocument?.public_key || "-"}
-                        </pre>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -856,6 +820,21 @@ class AdminDashboardPage extends Component {
       pickupMessage,
       pickupError,
     } = this.state;
+    const { dashboardCurrentPage, dashboardReportsPerPage } = this.state;
+    const totalDashboardPages = Math.max(
+      1,
+      Math.ceil(reports.length / dashboardReportsPerPage)
+    );
+    const safeDashboardPage = Math.min(
+      dashboardCurrentPage,
+      totalDashboardPages
+    );
+    const dashboardStartIndex =
+      (safeDashboardPage - 1) * dashboardReportsPerPage;
+    const dashboardPaginatedReports = reports.slice(
+      dashboardStartIndex,
+      dashboardStartIndex + dashboardReportsPerPage
+    );
 
     return (
       <div className="min-h-screen bg-[#F6F7FB] font-['Plus_Jakarta_Sans'] text-[#002B5B]">
@@ -1089,7 +1068,7 @@ class AdminDashboardPage extends Component {
                     </thead>
 
                     <tbody>
-                      {reports.map((report) => {
+                      {dashboardPaginatedReports.map((report) => {
                         const disabled = this.isFinalStatus(report);
 
                         return (
@@ -1167,9 +1146,52 @@ class AdminDashboardPage extends Component {
                   </table>
                 </div>
               )}
-              <div className="flex justify-between items-center mt-8 text-xs text-gray-500">
-                <p>Menampilkan {reports.length} laporan</p>
-              </div>
+              {reports.length > dashboardReportsPerPage && (
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-8 text-xs text-gray-500">
+                  <p>
+                    Menampilkan{" "}
+                    {reports.length === 0 ? 0 : dashboardStartIndex + 1}
+                    -
+                    {Math.min(
+                      dashboardStartIndex + dashboardReportsPerPage,
+                      reports.length
+                    )}{" "}
+                    dari {reports.length} laporan
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        this.setDashboardPage(
+                          Math.max(1, safeDashboardPage - 1)
+                        )
+                      }
+                      disabled={safeDashboardPage === 1}
+                      className="w-9 h-9 rounded-xl border border-[#E7ECF3] bg-white text-[#163A70] font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] transition-all"
+                    >
+                      ‹
+                    </button>
+
+                    <span className="text-[11px] font-bold text-[#163A70] px-2">
+                      {safeDashboardPage} / {totalDashboardPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        this.setDashboardPage(
+                          Math.min(totalDashboardPages, safeDashboardPage + 1)
+                        )
+                      }
+                      disabled={safeDashboardPage === totalDashboardPages}
+                      className="w-9 h-9 rounded-xl border border-[#E7ECF3] bg-white text-[#163A70] font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] transition-all"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
 
             <PageFooter />

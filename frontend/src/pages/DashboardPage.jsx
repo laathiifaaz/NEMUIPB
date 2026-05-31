@@ -50,9 +50,19 @@ class DashboardPage extends Component {
 
       const sortedItems = verifiedItems
         .sort(
-          (a, b) =>
-            Number(b.laporan_id || b.barang_id || 0) -
-            Number(a.laporan_id || a.barang_id || 0)
+          (a, b) => {
+            const priorityDiff =
+              this.getRecentItemPriority(a) - this.getRecentItemPriority(b);
+
+            if (priorityDiff !== 0) {
+              return priorityDiff;
+            }
+
+            return (
+              Number(b.laporan_id || b.barang_id || 0) -
+              Number(a.laporan_id || a.barang_id || 0)
+            );
+          }
         )
         .slice(0, 3);
 
@@ -81,6 +91,13 @@ class DashboardPage extends Component {
     window.location.reload();
   };
 
+  getRecentItemPriority(item) {
+    if (item.status_barang === "ditemukan") return 0;
+    if (item.status_barang === "hilang") return 1;
+    if (["selesai", "dikembalikan"].includes(item.status_barang)) return 2;
+    return 3;
+  }
+
   fetchRecentItems = async () => {
     try {
       const data = await BarangService.getAllBarang();
@@ -89,8 +106,14 @@ class DashboardPage extends Component {
 
       const sortedItems = [...verifiedItems]
         .sort((a, b) => {
+          const priorityDiff = this.getRecentItemPriority(a) - this.getRecentItemPriority(b);
+
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
+
           return (
-            Number(b.laporan_id || b.barang_id || 0) -
+            Number(b.laporan_id || b.barang_id || 0) -  
             Number(a.laporan_id || a.barang_id || 0)
           );
         })
@@ -198,7 +221,7 @@ class DashboardPage extends Component {
                 className="
                   bg-white
                   rounded-[24px]
-                  p-2.5
+                  p-3.5
                   border
                   border-gray-50
                   shadow-sm
@@ -208,7 +231,7 @@ class DashboardPage extends Component {
                   w-full
                 "
               >
-                <div className="rounded-[18px] overflow-hidden mb-3 aspect-[2.5/2.2] bg-gray-50 relative">
+                <div className="rounded-[18px] overflow-hidden mb-3 aspect-[2.4/2.1] bg-gray-50 relative">
                   <img
                     src={this.getItemImage(item)}
                     alt={item.nama_barang}
@@ -217,7 +240,7 @@ class DashboardPage extends Component {
 
                   <div
                     className={`
-                      absolute top-4 left-4 px-3 py-1 rounded-full
+                      absolute top-4 left-4 px-3 py-1 rounded-full shadow-lg shadow-black/10
                       text-[9px] font-black uppercase text-white
                       ${
                         item.status_barang === "hilang"
@@ -230,15 +253,9 @@ class DashboardPage extends Component {
                   >
                     {item.status_barang}
                   </div>
-
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">
-                    <p className="text-[10px] font-bold text-[#002B5B]">
-                      {item.tanggal_kejadian}
-                    </p>
-                  </div>
                 </div>
 
-                <div className="px-3 pb-3">
+                <div className="px-3 pb-4">
                   <h4 className="font-bold text-[#002B5B] text-lg mb-1 truncate">
                     {item.nama_barang}
                   </h4>
@@ -251,11 +268,9 @@ class DashboardPage extends Component {
                   <div className="flex items-center gap-2 text-gray-600 text-[11px] mb-4 font-bold">
                     <i className="far fa-calendar-alt text-[#9A7D0A]"></i>
                     <span>
-                      {item.status_barang === "hilang"
-                        ? "Hilang"
-                        : item.status_barang === "ditemukan"
-                        ? "Ditemukan"
-                        : "Selesai"}
+                      {item.jenis_laporan === "penemuan"
+                        ? "Penemuan"
+                        : "Hilang"}
                       : {item.tanggal_kejadian}
                     </span>
                   </div>
@@ -295,7 +310,7 @@ class DashboardPage extends Component {
               Tempat Pengambilan & Penyerahan Barang
             </p>
             <h3 className="text-2xl font-extrabold text-[#002B5B] mb-2">
-              Pos Keamanan Asrama IPB
+              Pos Keamanan Nemu IPB
             </h3>
             <a
               href="https://www.google.com/maps/search/?api=1&query=Kampus%20IPB%20Dramaga%20Bogor"

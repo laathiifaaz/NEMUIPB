@@ -457,16 +457,9 @@ const isPenemuan = reportType === "penemuan";
         <div className="flex gap-4">
           <button
             onClick={() => {
-
               const valid = validateForm();
 
-              if (!valid) {
-                setState({
-                  showErrorModal: true,
-                });
-
-                return;
-              }
+              if (!valid) return;
 
               setState({
                 showSubmitModal: true,

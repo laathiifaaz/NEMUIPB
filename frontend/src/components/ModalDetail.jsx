@@ -57,7 +57,20 @@ const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
   const reportTypeLabel =
     data.jenis_laporan === "kehilangan" ? "Kehilangan" : "Penemuan";
   const dateLabel =
-    data.jenis_laporan === "kehilangan" ? "Tanggal Kehilangan" : "Tanggal Penemuan";
+    data.jenis_laporan === "kehilangan"
+      ? "Tanggal Kehilangan"
+      : "Tanggal Penemuan";
+  const statusLabel = data.status_barang || data.status || "DILAPORKAN";
+  const statusBadgeClass =
+    statusLabel === "hilang"
+      ? "bg-blue-500"
+      : statusLabel === "ditemukan"
+      ? "bg-cyan-600"
+      : statusLabel === "diklaim"
+      ? "bg-[#0B2B5B]"
+      : statusLabel === "selesai"
+      ? "bg-green-600"
+      : "bg-yellow-500";
 
   const handleClaim = () => {
     const targetPath = `/klaim/${barangId}`;
@@ -78,11 +91,11 @@ const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
       }`}
       onClick={onClose}
     >
-      <div
+        <div
         className={`w-full bg-white overflow-hidden relative shadow-2xl transition-all ${
           compact
-            ? "max-w-[940px] max-h-[calc(100vh-32px)] rounded-[24px]"
-            : "max-w-[1060px] max-h-[92vh] rounded-[32px]"
+            ? "max-w-[980px] max-h-[calc(100vh-32px)] rounded-[24px]"
+            : "max-w-[1140px] max-h-[92vh] rounded-[32px]"
         }`}
         onClick={(event) => event.stopPropagation()}
       >
@@ -147,8 +160,8 @@ const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
           <div
             className={`flex-1 flex flex-col min-w-0 ${
               compact
-                ? "p-5 pr-14 md:p-7 md:pr-16 gap-3"
-                : "p-8 pr-14 md:p-12 md:pr-16 gap-6"
+                ? "p-6 pr-16 md:p-8 md:pr-20 gap-3"
+                : "p-9 pr-16 md:p-14 md:pr-20 gap-6"
             }`}
           >
             <div className="flex justify-between items-start gap-4">
@@ -165,12 +178,9 @@ const ModalDetail = ({ data, onClose, navigate, compact = false }) => {
                 </h2>
               </div>
 
-              <div className="text-right shrink-0">
-                <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">
-                  {data.status_barang || data.status || "DILAPORKAN"}
-                </p>
-                <p className="text-xs md:text-sm font-bold text-[#002B5B] leading-snug">
-                  {formatTanggal(data.tanggal_kejadian || data.tgl || data.tanggal)}
+              <div className={`text-right shrink-0 ${statusBadgeClass} shadow-lg shadow-black/10 rounded-2xl px-3 py-2`}>
+                <p className="text-[10px] font-black text-white tracking-wider uppercase mb-0">
+                  {statusLabel}
                 </p>
               </div>
             </div>

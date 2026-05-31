@@ -163,10 +163,10 @@ class PanduanPage extends Component {
               [
                 "Buka menu Laporan pada sidebar.",
                 "Pilih submenu Kehilangan.",
-                "Isi detail barang seperti nama barang, kategori, dan deskripsi.",
-                "Isi lokasi serta tanggal kehilangan barang.",
-                "Unggah bukti visual barang.",
-                "Tekan tombol Kirim Laporan untuk menyimpan laporan.",
+                "Isi detail barang seperti nama, kategori, deskripsi, lokasi, dan tanggal kehilangan.",
+                "Unggah foto atau bukti visual jika tersedia.",
+                "Tekan tombol Kirim Laporan lalu tunggu verifikasi admin.",
+                "Pantau status laporan hingga disetujui atau ditolak.",
               ],
               "bg-[#FFF1F1] text-[#D1495B]"
             )}
@@ -178,23 +178,26 @@ class PanduanPage extends Component {
               [
                 "Buka menu Laporan pada sidebar.",
                 "Pilih submenu Penemuan.",
-                "Isi detail barang yang ditemukan.",
-                "Tambahkan lokasi serta tanggal penemuan.",
+                "Isi detail barang yang ditemukan dengan informasi yang jelas.",
+                "Tambahkan lokasi serta tanggal barang ditemukan.",
                 "Unggah foto barang agar mudah dikenali.",
-                "Kirim laporan untuk membantu pemilik menemukan barangnya.",
+                "Kirim laporan lalu tunggu verifikasi admin.",
+                "Setelah laporan disetujui admin, buka detail laporan untuk melihat kode dropoff dan gunakan saat menyerahkan barang ke Pos Keamanan NEMU IPB.",
               ],
               "bg-[#EEFCEB] text-[#2D9C44]"
             )}
 
             {this.renderGuideCard(
-              "fa-check-circle",
-              "Proses Verifikasi",
-              "Admin akan memeriksa laporan yang dikirim sebelum dipublikasikan ke sistem.",
+              "fa-hand-holding",
+              "Klaim Barang",
+              "Gunakan klaim jika barang ditemukan di koleksi sesuai dengan barang hilang milikmu.",
               [
-                "Laporan akan masuk ke status menunggu verifikasi.",
-                "Admin memeriksa kesesuaian informasi laporan.",
-                "Jika valid, laporan akan diverifikasi.",
-                "Jika tidak valid, admin dapat menolak laporan dengan catatan tertentu.",
+                "Pastikan kamu sudah punya laporan kehilangan yang disetujui admin.",
+                "Buka Koleksi Barang lalu pilih barang berstatus ditemukan.",
+                "Buka detail barang dan pilih laporan kehilangan yang sesuai.",
+                "Klik Ajukan Klaim untuk mengirim permohonan ke admin.",
+                "Kirim klaim dan tunggu verifikasi admin.",
+                "Jika klaim disetujui, kamu akan menerima kode pickup untuk pengambilan barang di Pos Keamanan NEMU IPB.",
               ],
               "bg-[#FFF8E5] text-[#C89B00]"
             )}

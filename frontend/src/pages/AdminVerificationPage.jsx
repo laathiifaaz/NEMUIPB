@@ -25,6 +25,8 @@ class AdminVerificationPage extends Component {
       search: "",
       currentPage: 1,
       reportsPerPage: 6,
+      claimHistoryCurrentPage: 1,
+      claimHistoryPerPage: 10,
       activeVerificationView: "laporan",
 
       selectedFilter: "semua",
@@ -113,7 +115,14 @@ class AdminVerificationPage extends Component {
   }
 
   handleClaimStorageChange = () => {
-    this.fetchPendingClaims();
+    this.setState(
+      {
+        claimHistory: this.getStoredClaimHistory(),
+      },
+      () => {
+        this.fetchPendingClaims();
+      }
+    );
   };
 
   toggleSidebar = () => {
@@ -548,6 +557,7 @@ class AdminVerificationPage extends Component {
           (item) => item.klaim_id !== claim.klaim_id
         ),
         claimHistory: nextClaimHistory,
+        claimHistoryCurrentPage: 1,
         claimActionLoading: false,
       }));
 
@@ -745,6 +755,12 @@ class AdminVerificationPage extends Component {
   setPage = (page) => {
     this.setState({
       currentPage: page,
+    });
+  };
+
+  setClaimHistoryPage = (page) => {
+    this.setState({
+      claimHistoryCurrentPage: page,
     });
   };
 
@@ -1088,6 +1104,14 @@ class AdminVerificationPage extends Component {
 
     const lostReportItem = selectedClaimLostReport?.barang || {};
     const claimedItem = selectedClaimItemDetail || selectedClaim;
+    const claimedItemImage = this.getImageSrc(
+      claimedItem.dokumentasi || selectedClaim.dokumentasi
+    );
+    const lostReportImage = this.getImageSrc(
+      lostReportItem.dokumentasi ||
+        selectedClaimLostReport?.dokumentasi ||
+        selectedClaimLostReport?.barang?.dokumentasi
+    );
     const submittedAt = selectedClaim.created_time
       ? new Date(selectedClaim.created_time).toLocaleString("id-ID", {
           day: "2-digit",
@@ -1141,6 +1165,16 @@ class AdminVerificationPage extends Component {
               <h3 className="text-lg font-extrabold text-[#163A70] mb-4">
                 Detail Barang yang Diklaim
               </h3>
+
+              <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                  <img
+                    src={claimedItemImage}
+                    alt={claimedItem.nama_barang || "Barang yang diklaim"}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
 
               <div className="space-y-3 text-sm">
                 <div>
@@ -1220,6 +1254,16 @@ class AdminVerificationPage extends Component {
               <h3 className="text-lg font-extrabold text-[#163A70] mb-4">
                 Detail Laporan Kehilangan User
               </h3>
+
+              <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                  <img
+                    src={lostReportImage}
+                    alt={lostReportItem.nama_barang || "Laporan kehilangan"}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
 
               <div className="space-y-3 text-sm">
                 <div>
@@ -1418,6 +1462,16 @@ class AdminVerificationPage extends Component {
       selectedClaimHistory.barang_detail ||
       selectedClaimHistory.item_detail ||
       selectedClaimHistory;
+    const claimedItemImage = this.getImageSrc(
+      claimedItem.dokumentasi ||
+        selectedClaimHistoryItemDetail?.dokumentasi ||
+        selectedClaimHistory.dokumentasi
+    );
+    const lostReportImage = this.getImageSrc(
+      lostReportItem.dokumentasi ||
+        selectedClaimHistoryLostReport?.dokumentasi ||
+        selectedClaimHistoryLostReport?.barang?.dokumentasi
+    );
     const isComplete = ["selesai", "dikembalikan"].includes(
       selectedClaimHistory.status_laporan
     ) || selectedClaimHistory.status_barang === "selesai";
@@ -1480,6 +1534,16 @@ class AdminVerificationPage extends Component {
               <h3 className="text-lg font-extrabold text-[#163A70] mb-4">
                 Detail Barang yang Diklaim
               </h3>
+
+              <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                  <img
+                    src={claimedItemImage}
+                    alt={claimedItem.nama_barang || "Barang yang diklaim"}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
 
               <div className="space-y-3 text-sm">
                 <div>
@@ -1555,6 +1619,16 @@ class AdminVerificationPage extends Component {
               <h3 className="text-lg font-extrabold text-[#163A70] mb-4">
                 Detail Laporan Kehilangan User
               </h3>
+
+              <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                  <img
+                    src={lostReportImage}
+                    alt={lostReportItem.nama_barang || "Laporan kehilangan"}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
 
               <div className="space-y-3 text-sm">
                 <div>
@@ -2051,8 +2125,30 @@ class AdminVerificationPage extends Component {
     const rejectedCount = filteredReports.filter(
       (r) => r.status_verifikasi === "ditolak"
     ).length;
-    const claimedHistoryReports = this.state.claimHistory.filter((claim) =>
+    const claimedHistoryReports = this.state.claimHistory
+      .filter((claim) =>
       ["diterima", "ditolak"].includes(claim.status_klaim)
+      )
+      .sort((a, b) => {
+        const left = new Date(b.claim_verified_at || b.updated_time || b.created_time || 0).getTime();
+        const right = new Date(a.claim_verified_at || a.updated_time || a.created_time || 0).getTime();
+
+        return left - right;
+      });
+    const { claimHistoryCurrentPage, claimHistoryPerPage } = this.state;
+    const totalClaimHistoryPages = Math.max(
+      1,
+      Math.ceil(claimedHistoryReports.length / claimHistoryPerPage)
+    );
+    const safeClaimHistoryPage = Math.min(
+      claimHistoryCurrentPage,
+      totalClaimHistoryPages
+    );
+    const claimHistoryStartIndex =
+      (safeClaimHistoryPage - 1) * claimHistoryPerPage;
+    const paginatedClaimHistoryReports = claimedHistoryReports.slice(
+      claimHistoryStartIndex,
+      claimHistoryStartIndex + claimHistoryPerPage
     );
 
     return (
@@ -2284,7 +2380,7 @@ class AdminVerificationPage extends Component {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {claimedHistoryReports.map((report) => {
+                  {paginatedClaimHistoryReports.map((report) => {
                     const isComplete = ["selesai", "dikembalikan"].includes(
                       report.status_laporan
                     ) || report.status_barang === "selesai";
@@ -2338,6 +2434,58 @@ class AdminVerificationPage extends Component {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {claimedHistoryReports.length > claimHistoryPerPage && (
+                <div className="flex items-center justify-between gap-4 mt-6 text-xs text-gray-500">
+                  <p>
+                    Menampilkan{" "}
+                    {claimedHistoryReports.length === 0
+                      ? 0
+                      : claimHistoryStartIndex + 1}
+                    -
+                    {Math.min(
+                      claimHistoryStartIndex + claimHistoryPerPage,
+                      claimedHistoryReports.length
+                    )}{" "}
+                    dari {claimedHistoryReports.length} histori
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        this.setClaimHistoryPage(
+                          Math.max(1, safeClaimHistoryPage - 1)
+                        )
+                      }
+                      disabled={safeClaimHistoryPage === 1}
+                      className="w-9 h-9 rounded-xl border border-[#E7ECF3] bg-white text-[#163A70] font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] transition-all"
+                    >
+                      ‹
+                    </button>
+
+                    <span className="text-[11px] font-bold text-[#163A70] px-2">
+                      {safeClaimHistoryPage} / {totalClaimHistoryPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        this.setClaimHistoryPage(
+                          Math.min(
+                            totalClaimHistoryPages,
+                            safeClaimHistoryPage + 1
+                          )
+                        )
+                      }
+                      disabled={safeClaimHistoryPage === totalClaimHistoryPages}
+                      className="w-9 h-9 rounded-xl border border-[#E7ECF3] bg-white text-[#163A70] font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] transition-all"
+                    >
+                      ›
+                    </button>
+                  </div>
                 </div>
               )}
             </section>

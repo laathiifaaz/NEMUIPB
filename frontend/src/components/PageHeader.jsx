@@ -53,7 +53,7 @@ const getUserNotificationDescription = (notification) => {
   const normalizedMessage = message.toLowerCase();
 
   const displayMessage = normalizedMessage.includes("klaim barang anda diterima")
-    ? "Klaim diterima. Ambil barang di Pos Keamanan Asrama IPB, Senin-Jumat 08.00-17.00 WIB."
+    ? "Klaim diterima. Ambil barang di Pos Keamanan NEMU IPB, Senin-Jumat 08.00-17.00 WIB."
     : message;
 
   if (!notification.laporan_id) return message;

@@ -248,7 +248,7 @@ class ClaimBarangPage extends Component {
         laporan_id: selectedReportId,
         klaim_id: result.klaim_id,
         status_klaim: result.status_klaim || "diproses",
-        updated_at: new Date().toISOString(),
+        updated_at: result.updated_time || new Date().toISOString(),
       };
       localStorage.setItem(
         "nemuipb_claim_status",

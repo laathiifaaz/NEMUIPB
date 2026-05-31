@@ -1,5 +1,8 @@
 import React, { Component } from "react";
 import AuthService from "../services/AuthService";
+import AdminService from "../services/AdminService";
+import ReportService from "../services/ReportService";
+import BarangService from "../services/BarangService";
 import AdminSidebar from "../components/admin/AdminSidebar";
 import PageHeader from "../components/PageHeader";
 import {
@@ -14,6 +17,12 @@ class AdminPickupHistoryPage extends Component {
     this.state = {
       pickupHistory: this.getStoredPickupHistory(),
       isSidebarExpanded: getStoredSidebarExpanded(),
+      showPickupHistoryDetailModal: false,
+      selectedPickupHistory: null,
+      selectedPickupHistoryReport: null,
+      selectedPickupHistoryBarang: null,
+      selectedPickupHistoryDocument: null,
+      pickupHistoryDocumentLoading: false,
     };
   }
 
@@ -46,6 +55,64 @@ class AdminPickupHistoryPage extends Component {
       setStoredSidebarExpanded(isSidebarExpanded);
 
       return { isSidebarExpanded };
+    });
+  };
+
+  openPickupHistoryDetail = (item) => {
+    this.setState({
+      showPickupHistoryDetailModal: true,
+      selectedPickupHistory: item,
+      selectedPickupHistoryReport: null,
+      selectedPickupHistoryBarang: null,
+      selectedPickupHistoryDocument: null,
+      pickupHistoryDocumentLoading: true,
+    });
+
+    const detailRequests = [];
+
+    if (item?.laporan_id || item?.laporan_kehilangan_id) {
+      detailRequests.push(
+        ReportService.getReportDetail(
+          item.laporan_id || item.laporan_kehilangan_id
+        )
+      );
+    } else {
+      detailRequests.push(Promise.resolve(null));
+    }
+
+    if (item?.barang_id) {
+      detailRequests.push(BarangService.getDetailBarang(item.barang_id));
+    } else {
+      detailRequests.push(Promise.resolve(null));
+    }
+
+    if (item?.klaim_id) {
+      detailRequests.push(AdminService.getSerahTerima(item.klaim_id));
+    } else {
+      detailRequests.push(Promise.resolve(null));
+    }
+
+    Promise.allSettled(detailRequests).then((results) => {
+      const [reportResult, barangResult, documentResult] = results;
+
+      this.setState({
+        selectedPickupHistoryReport:
+          reportResult?.status === "fulfilled" ? reportResult.value : null,
+        selectedPickupHistoryBarang:
+          barangResult?.status === "fulfilled" ? barangResult.value : null,
+        selectedPickupHistoryDocument:
+          documentResult?.status === "fulfilled" ? documentResult.value : null,
+        pickupHistoryDocumentLoading: false,
+      });
+    });
+  };
+
+  closePickupHistoryDetail = () => {
+    this.setState({
+      showPickupHistoryDetailModal: false,
+      selectedPickupHistory: null,
+      selectedPickupHistoryDocument: null,
+      pickupHistoryDocumentLoading: false,
     });
   };
 
@@ -86,8 +153,40 @@ class AdminPickupHistoryPage extends Component {
     }
   }
 
+  formatVerifiedDate(value) {
+    if (!value) return "-";
+
+    try {
+      return new Date(value).toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+    } catch (error) {
+      return value;
+    }
+  }
+
+  getImageSrc(dokumentasi) {
+    if (!dokumentasi) return "/images/no-image.png";
+    if (dokumentasi.startsWith("data:image/")) return dokumentasi;
+    if (dokumentasi.startsWith("http")) return dokumentasi;
+    if (dokumentasi.startsWith("/")) return dokumentasi;
+
+    return `/images/${dokumentasi}`;
+  }
+
   render() {
-    const { pickupHistory, isSidebarExpanded } = this.state;
+    const {
+      pickupHistory,
+      isSidebarExpanded,
+      showPickupHistoryDetailModal,
+      selectedPickupHistory,
+      selectedPickupHistoryReport,
+      selectedPickupHistoryBarang,
+      selectedPickupHistoryDocument,
+      pickupHistoryDocumentLoading,
+    } = this.state;
     const sortedHistory = [...pickupHistory].sort((a, b) => {
       const left = new Date(b.verified_at || 0).getTime();
       const right = new Date(a.verified_at || 0).getTime();
@@ -192,7 +291,7 @@ class AdminPickupHistoryPage extends Component {
                 {sortedHistory.map((item, index) => (
                   <div
                     key={`${item.code}-${item.verified_at || index}`}
-                    className="bg-white border border-[#E7ECF3] rounded-[22px] p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+                    className="bg-white border border-[#E7ECF3] rounded-[22px] p-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-3 flex-wrap">
@@ -213,29 +312,312 @@ class AdminPickupHistoryPage extends Component {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:min-w-[420px]">
-                      <div className="bg-[#F8FAFC] rounded-2xl px-4 py-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                          Status Barang
-                        </p>
-                        <p className="text-sm font-bold text-[#102348]">
-                          {item.status_barang || "-"}
-                        </p>
-                      </div>
-
-                      <div className="bg-[#F8FAFC] rounded-2xl px-4 py-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                    <div className="flex flex-col items-end text-right gap-2 md:min-w-[180px]">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-[#0F9F4B] mb-1">
                           Diverifikasi
                         </p>
                         <p className="text-sm font-bold text-[#102348]">
-                          {this.formatDateTime(item.verified_at)}
+                          {this.formatVerifiedDate(item.verified_at)}
                         </p>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => this.openPickupHistoryDetail(item)}
+                        className="inline-flex items-center justify-center rounded-xl bg-[#163A70] px-4 py-2 text-xs font-black text-white hover:bg-[#102348] transition-all"
+                      >
+                        Detail
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
+            {showPickupHistoryDetailModal && selectedPickupHistory ? (
+              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4 py-6">
+                <div className="bg-white rounded-[28px] w-full max-w-6xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
+                  <div className="sticky top-0 z-10 bg-white border-b border-[#EEF2F6] px-6 py-5 flex items-center justify-between rounded-t-[28px]">
+                    <div>
+                      <h2 className="text-2xl font-extrabold text-[#102348]">
+                        Detail Serah Terima
+                      </h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Status verifikasi, dokumen serah terima, dan detail terkait.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={this.closePickupHistoryDetail}
+                      className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      aria-label="Tutup detail serah terima"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    <div className="rounded-xl border border-green-100 bg-[#EEFDF3] px-4 py-3 text-[#0F9F4B]">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.22em]">
+                            Status Verifikasi
+                          </p>
+                          <h3 className="text-[15px] font-extrabold leading-tight">
+                            Sudah diverifikasi
+                          </h3>
+                        </div>
+
+                        <div className="flex flex-wrap items-start gap-2 text-[10px] font-black text-[#102348]">
+                          <span className="rounded-lg bg-white/80 px-2.5 py-1.5">
+                            Kode: {selectedPickupHistory.code || "-"}
+                          </span>
+                          <span className="rounded-lg bg-white/80 px-2.5 py-1.5">
+                            Klaim #{selectedPickupHistory.klaim_id || "-"}
+                          </span>
+                          <div className="ml-auto flex flex-col items-end text-right">
+                            <span className="text-[10px] uppercase tracking-widest text-[#0F9F4B]">
+                              Diverifikasi
+                            </span>
+                            <span className="text-[11px] font-bold text-[#102348]">
+                              {this.formatVerifiedDate(selectedPickupHistory.verified_at)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4">
+                      <div className="bg-[#F8FAFC] rounded-2xl border border-[#E7ECF3] p-6">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
+                          Dokumen Serah Terima
+                        </p>
+                        <pre className="whitespace-pre-wrap break-words text-[11px] font-semibold text-gray-700 leading-[1.45]">
+                          {pickupHistoryDocumentLoading
+                            ? "Memuat dokumen serah terima..."
+                            : selectedPickupHistoryDocument?.dokumen_text ||
+                              "-"}
+                        </pre>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                            Pickup
+                          </p>
+                          <p className="text-[12px] font-bold text-[#102348]">
+                            {selectedPickupHistory.code || "-"}
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-1">
+                            Klaim #{selectedPickupHistory.klaim_id || "-"}
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-1">
+                            Diverifikasi: {this.formatDateTime(selectedPickupHistory.verified_at)}
+                          </p>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-[#E7ECF3] p-5">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                            Detail Terkait
+                          </p>
+                          <div className="space-y-1.5 text-[11px]">
+                            <p className="font-bold text-[#102348]">
+                              Barang #{selectedPickupHistory.barang_id || "-"}
+                            </p>
+                            <p className="text-gray-500">
+                              Laporan #{selectedPickupHistory.laporan_id || "-"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <section className="border border-[#E7ECF3] rounded-2xl p-5 bg-white">
+                        <h3 className="text-lg font-extrabold text-[#163A70] mb-4">
+                          Detail Laporan Kehilangan User
+                        </h3>
+
+                        <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                          <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                            <img
+                              src={this.getImageSrc(
+                                selectedPickupHistoryReport?.dokumentasi ||
+                                  selectedPickupHistoryReport?.barang?.dokumentasi ||
+                                  selectedPickupHistoryReport?.barang?.foto ||
+                                  selectedPickupHistoryReport?.gambar ||
+                                  selectedPickupHistory?.dokumentasi
+                              )}
+                              alt={
+                                selectedPickupHistoryReport?.nama_barang ||
+                                "Laporan kehilangan"
+                              }
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 text-sm">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                              Laporan Kehilangan
+                            </p>
+                            <p className="font-semibold text-[#102348]">
+                            {selectedPickupHistoryReport?.nama_barang ||
+                              selectedPickupHistoryReport?.item_name ||
+                              selectedPickupHistoryReport?.barang?.nama_barang ||
+                              selectedPickupHistoryReport?.barang?.item_name ||
+                              "-"}
+                          </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Pelapor
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryReport?.pelapor || selectedPickupHistoryReport?.reporter || selectedPickupHistory?.pelapor || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Lokasi
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryReport?.lokasi || selectedPickupHistoryReport?.barang?.lokasi || selectedPickupHistory?.lokasi || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Tanggal
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryReport?.tanggal_kejadian || selectedPickupHistoryReport?.tanggal_laporan || selectedPickupHistoryReport?.barang?.tanggal_kejadian || selectedPickupHistory?.tanggal_kejadian || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Jenis
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryReport?.jenis_laporan || selectedPickupHistoryReport?.jenis || selectedPickupHistory?.jenis_laporan || "-"}
+                              </p>
+                            </div>
+                            <div className="col-span-2">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Kategori
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryReport?.kategori || selectedPickupHistoryReport?.barang?.kategori || selectedPickupHistory?.kategori || "-"}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                              Deskripsi
+                            </p>
+                            <p className="font-semibold text-gray-600 leading-relaxed">
+                              {selectedPickupHistoryReport?.deskripsi || selectedPickupHistoryReport?.deskripsi_barang || selectedPickupHistoryReport?.barang?.deskripsi || selectedPickupHistory?.deskripsi || "-"}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="border border-[#E7ECF3] rounded-2xl p-5 bg-white">
+                        <h3 className="text-lg font-extrabold text-[#163A70] mb-4">
+                          Detail Barang yang Diklaim
+                        </h3>
+
+                        <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                          <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                            <img
+                              src={this.getImageSrc(
+                                selectedPickupHistoryBarang?.dokumentasi ||
+                                  selectedPickupHistoryBarang?.foto ||
+                                  selectedPickupHistoryBarang?.image ||
+                                  selectedPickupHistory?.dokumentasi
+                              )}
+                              alt={
+                                selectedPickupHistoryBarang?.nama_barang ||
+                                "Barang diklaim"
+                              }
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 text-sm">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                              Nama Barang
+                            </p>
+                            <p className="font-semibold text-[#102348]">
+                            {selectedPickupHistoryBarang?.nama_barang ||
+                              selectedPickupHistoryBarang?.item_name ||
+                              selectedPickupHistory?.nama_barang ||
+                              selectedPickupHistoryReport?.barang?.nama_barang ||
+                              "-"}
+                          </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                ID Barang
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                #{selectedPickupHistory?.barang_id || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Status
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryBarang?.status_barang || selectedPickupHistory?.status_barang || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Kategori
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryBarang?.kategori || selectedPickupHistoryReport?.barang?.kategori || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Lokasi
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryBarang?.lokasi || selectedPickupHistoryReport?.barang?.lokasi || "-"}
+                              </p>
+                            </div>
+                            <div className="col-span-2">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                Tanggal Penemuan
+                              </p>
+                              <p className="font-semibold text-gray-600">
+                                {selectedPickupHistoryBarang?.tanggal_kejadian || selectedPickupHistoryBarang?.tanggal_laporan || selectedPickupHistory?.tanggal_kejadian || "-"}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                              Deskripsi
+                            </p>
+                            <p className="font-semibold text-gray-600 leading-relaxed">
+                              {selectedPickupHistoryBarang?.deskripsi || selectedPickupHistoryBarang?.deskripsi_barang || selectedPickupHistory?.deskripsi || "-"}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </main>
         </div>
       </div>
