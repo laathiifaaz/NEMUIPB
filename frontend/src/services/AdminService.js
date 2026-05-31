@@ -76,6 +76,14 @@ class AdminService extends ApiService {
     return this.handleResponse(res);
   }
 
+  async getClaimHistory() {
+    const res = await fetch(`${this.baseUrl}/admin/klaim/history`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse(res);
+  }
+
   async verifyClaim(klaimId, statusKlaim, catatanAdmin = "") {
     const res = await fetch(`${this.baseUrl}/admin/klaim/${klaimId}/verifikasi`, {
       method: "PATCH",
@@ -96,6 +104,14 @@ class AdminService extends ApiService {
       body: JSON.stringify({
         pickup_code: pickupCode,
       }),
+    });
+
+    return this.handleResponse(res);
+  }
+
+  async getPickupHistory() {
+    const res = await fetch(`${this.baseUrl}/admin/serah-terima/history`, {
+      headers: this.getAuthHeaders(),
     });
 
     return this.handleResponse(res);

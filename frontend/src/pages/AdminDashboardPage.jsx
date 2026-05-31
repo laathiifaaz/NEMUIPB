@@ -30,6 +30,8 @@ class AdminDashboardPage extends Component {
         show: false,
         type: null,
         laporanId: null,
+        rejectNote: "",
+        error: "",
       },
       selectedFilter: "semua",
       showFilterMenu: false,
@@ -39,7 +41,6 @@ class AdminDashboardPage extends Component {
       pickupLoading: false,
       pickupMessage: "",
       pickupError: "",
-      pickupHistory: this.getStoredPickupHistory(),
       handoverDocument: null,
       handoverVerification: null,
       showHandoverModal: false,
@@ -110,44 +111,6 @@ class AdminDashboardPage extends Component {
     AuthService.logout();
     window.location.href = "/";
   };
-
-  getStoredPickupHistory() {
-    try {
-      return JSON.parse(
-        localStorage.getItem("nemuipb_admin_pickup_history") || "[]"
-      );
-    } catch (error) {
-      return [];
-    }
-  }
-
-  savePickupHistoryRecord(result, code) {
-    if (result.code_type !== "pickup" || !result.klaim_id) {
-      return this.state.pickupHistory;
-    }
-
-    const record = {
-      code,
-      code_type: result.code_type || "pickup",
-      message: result.message || "",
-      klaim_id: result.klaim_id,
-      barang_id: result.barang_id,
-      laporan_id: result.laporan_id,
-      status_barang: result.status_barang,
-      verified_at: new Date().toISOString(),
-    };
-    const nextHistory = [
-      record,
-      ...this.state.pickupHistory,
-    ].slice(0, 10);
-
-    localStorage.setItem(
-      "nemuipb_admin_pickup_history",
-      JSON.stringify(nextHistory)
-    );
-
-    return nextHistory;
-  }
 
   toggleFilterMenu = () => {
     this.setState({
@@ -223,6 +186,8 @@ class AdminDashboardPage extends Component {
         show: true,
         type: "verify",
         laporanId,
+        rejectNote: "",
+        error: "",
       },
     });
   };
@@ -233,6 +198,8 @@ class AdminDashboardPage extends Component {
         show: true,
         type: "deny",
         laporanId,
+        rejectNote: "",
+        error: "",
       },
     });
   };
@@ -243,12 +210,36 @@ class AdminDashboardPage extends Component {
         show: false,
         type: null,
         laporanId: null,
+        rejectNote: "",
+        error: "",
       },
     });
   };
 
+  handleRejectNoteChange = (event) => {
+    const value = event.target.value;
+
+    this.setState((prevState) => ({
+      confirmModal: {
+        ...prevState.confirmModal,
+        rejectNote: value,
+        error: "",
+      },
+    }));
+  };
+
   handleConfirmAction = async () => {
-    const { type, laporanId } = this.state.confirmModal;
+    const { type, laporanId, rejectNote } = this.state.confirmModal;
+
+    if (type === "deny" && !rejectNote.trim()) {
+      this.setState((prevState) => ({
+        confirmModal: {
+          ...prevState.confirmModal,
+          error: "Catatan penolakan wajib diisi.",
+        },
+      }));
+      return;
+    }
 
     try {
       if (type === "verify") {
@@ -256,7 +247,7 @@ class AdminDashboardPage extends Component {
       }
 
       if (type === "deny") {
-        await AdminService.denyReport(laporanId);
+        await AdminService.denyReport(laporanId, rejectNote.trim());
       }
 
       this.closeConfirmModal();
@@ -298,23 +289,21 @@ class AdminDashboardPage extends Component {
       return;
     }
 
-    try {
-      this.setState({
-        pickupLoading: true,
-        pickupError: "",
-        pickupMessage: "",
-      });
+      try {
+        this.setState({
+          pickupLoading: true,
+          pickupError: "",
+          pickupMessage: "",
+        });
 
-      const result = await AdminService.verifyPickupCode(pickupCode);
-      const nextHistory = this.savePickupHistoryRecord(result, pickupCode);
+        const result = await AdminService.verifyPickupCode(pickupCode);
 
-      this.setState({
-        pickupCode: "",
-        pickupLoading: false,
-        pickupMessage: result.message || "Kode pickup berhasil diverifikasi.",
-        pickupError: "",
-        pickupHistory: nextHistory,
-      });
+        this.setState({
+          pickupCode: "",
+          pickupLoading: false,
+          pickupMessage: result.message || "Kode pickup berhasil diverifikasi.",
+          pickupError: "",
+        });
 
       if (result.code_type === "pickup" && result.klaim_id) {
         this.setState({
@@ -615,18 +604,6 @@ class AdminDashboardPage extends Component {
                 <div className="flex gap-3">
                   <button
                     disabled={isDisabled}
-                    onClick={() => this.openDenyConfirm(report.laporan_id)}
-                    className={`px-5 py-3 rounded-xl text-xs font-bold transition-all ${
-                      isDisabled
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-red-50 text-red-600 hover:bg-red-100"
-                    }`}
-                  >
-                    Tolak
-                  </button>
-
-                  <button
-                    disabled={isDisabled}
                     onClick={() => this.openVerifyConfirm(report.laporan_id)}
                     className={`px-5 py-3 rounded-xl text-xs font-bold transition-all ${
                       isDisabled
@@ -635,6 +612,18 @@ class AdminDashboardPage extends Component {
                     }`}
                   >
                     Setujui
+                  </button>
+
+                  <button
+                    disabled={isDisabled}
+                    onClick={() => this.openDenyConfirm(report.laporan_id)}
+                    className={`px-5 py-3 rounded-xl text-xs font-bold transition-all ${
+                      isDisabled
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-red-50 text-red-600 hover:bg-red-100"
+                    }`}
+                  >
+                    Tolak
                   </button>
                 </div>
               </div>
@@ -676,6 +665,26 @@ class AdminDashboardPage extends Component {
             ? "Laporan yang ditolak tidak dapat diubah."
             : "Laporan yang disetujui tidak dapat diubah."}
         </p>
+
+        {isDeny && (
+          <div className="mb-5 text-left">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+              Catatan Penolakan
+            </label>
+            <textarea
+              value={confirmModal.rejectNote}
+              onChange={this.handleRejectNoteChange}
+              rows={3}
+              className="w-full rounded-2xl border border-[#E7ECF3] bg-[#F8FAFC] px-4 py-3 text-sm text-[#002B5B] outline-none focus:border-[#163A70] resize-none"
+              placeholder="Tulis alasan penolakan di sini"
+            />
+            {confirmModal.error && (
+              <p className="mt-2 text-xs font-bold text-red-500">
+                {confirmModal.error}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -896,7 +905,7 @@ class AdminDashboardPage extends Component {
 
                 <div className="bg-white border border-gray-100 px-7 py-4 rounded-xl text-center shadow-sm">
                   <p className="text-[10px] font-black tracking-widest text-gray-500">
-                    BARANG DIKEMBALIKAN
+                    LAPORAN SELESAI
                   </p>
                   <p className="text-2xl font-black text-[#002B5B]">
                     {summary.returned_items ?? 0}
@@ -920,7 +929,7 @@ class AdminDashboardPage extends Component {
                   <div>
                     <h3 className="text-xl font-extrabold">Tren Laporan</h3>
                     <p className="text-xs text-gray-400">
-                      Perbandingan laporan masuk dan barang ditemukan
+                      Perbandingan laporan masuk dan laporan selesai
                     </p>
                   </div>
 
@@ -931,7 +940,7 @@ class AdminDashboardPage extends Component {
                     </span>
                     <span className="flex items-center gap-1.5 text-[#002B5B]">
                       <span className="w-3 h-3 rounded-sm bg-[#8E793E]"></span>
-                      Ditemukan
+                      Laporan Selesai
                     </span>
                   </div>
                 </div>
@@ -1107,6 +1116,20 @@ class AdminDashboardPage extends Component {
                               <button
                                 disabled={disabled}
                                 onClick={() =>
+                                  this.openVerifyConfirm(report.laporan_id)
+                                }
+                                className={`px-4 py-2 rounded-lg text-xs font-bold mr-2 ${
+                                  disabled
+                                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                    : "bg-[#002B5B] text-white"
+                                }`}
+                              >
+                                Setujui
+                              </button>
+
+                              <button
+                                disabled={disabled}
+                                onClick={() =>
                                   this.openDenyConfirm(report.laporan_id)
                                 }
                                 className={`px-4 py-2 rounded-lg text-xs font-bold mr-2 ${
@@ -1116,20 +1139,6 @@ class AdminDashboardPage extends Component {
                                 }`}
                               >
                                 Tolak
-                              </button>
-
-                              <button
-                                disabled={disabled}
-                                onClick={() =>
-                                  this.openVerifyConfirm(report.laporan_id)
-                                }
-                                className={`px-4 py-2 rounded-lg text-xs font-bold mr-2 ${
-                                  disabled
-                                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                    : "bg-[#002B5B] text-white"
-                                }`}
-                              >
-                                Setujui 
                               </button>
 
                               <button

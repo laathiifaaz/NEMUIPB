@@ -56,17 +56,15 @@ class KoleksiBarangPage extends Component {
   }
 
   async componentDidMount() {
-    window.addEventListener("storage", this.handleClaimStorageChange);
-    window.addEventListener("focus", this.handleClaimStorageChange);
+    window.addEventListener("focus", this.handleRefresh);
     await this.fetchBarang();
   }
 
   componentWillUnmount() {
-    window.removeEventListener("storage", this.handleClaimStorageChange);
-    window.removeEventListener("focus", this.handleClaimStorageChange);
+    window.removeEventListener("focus", this.handleRefresh);
   }
 
-  handleClaimStorageChange = () => {
+  handleRefresh = () => {
     this.fetchBarang();
   };
 
@@ -156,30 +154,14 @@ class KoleksiBarangPage extends Component {
     );
   }
 
-  getPendingClaimedBarangIds() {
-    try {
-      const storedClaims = JSON.parse(
-        localStorage.getItem("nemuipb_claim_status") || "{}"
-      );
-
-      return new Set(
-        Object.values(storedClaims)
-          .filter((claim) => claim.status_klaim === "diproses")
-          .map((claim) => String(claim.barang_id))
-      );
-    } catch (error) {
-      return new Set();
-    }
-  }
-
   sortCollectionItems(items) {
     return [...items].sort((a, b) => {
       const getJenisPriority = (item) => {
-        if (item.status_barang === "ditemukan") return 0;
-        if (item.status_barang === "hilang") return 1;
-        if (item.jenis_laporan === "penemuan") return 0;
-        if (item.jenis_laporan === "kehilangan") return 1;
-        if (item.status_barang === "diklaim") return 2;
+        const status = this.getDisplayStatus(item);
+
+        if (status === "ditemukan") return 0;
+        if (status === "hilang") return 1;
+        if (status === "selesai") return 2;
         return 3;
       };
 
@@ -218,14 +200,15 @@ class KoleksiBarangPage extends Component {
     if (item.status_laporan === "selesai" && item.jenis_laporan !== "penemuan") {
       return "selesai";
     }
-    if (item.status_laporan === "siap_diambil") return "diklaim";
-    return item.status_barang || "tidak diketahui";
+    if (item.status_barang === "ditemukan") return "ditemukan";
+    if (item.status_barang === "hilang") return "hilang";
+    if (item.status_laporan === "siap_diambil") return "selesai";
+    return "selesai";
   }
 
   getDisplayStatusClass(status) {
     if (status === "hilang") return "bg-blue-500";
     if (status === "ditemukan") return "bg-cyan-600";
-    if (status === "diklaim") return "bg-[#0B2B5B]";
     if (status === "selesai") return "bg-green-600";
     return "bg-yellow-500";
   }
@@ -239,7 +222,7 @@ class KoleksiBarangPage extends Component {
       return "Hilang";
     }
 
-    if (item.status_laporan === "siap_diambil") return "Diklaim";
+    if (item.status_laporan === "siap_diambil") return "Selesai";
     if (item.status_barang === "hilang") return "Hilang";
     return "Tanggal";
   }
@@ -255,24 +238,7 @@ class KoleksiBarangPage extends Component {
 
     const normalizedKeyword = keyword.trim().toLowerCase();
 
-    const pendingClaimedBarangIds = this.getPendingClaimedBarangIds();
-
     const visibleItems = this.getVerifiedItems(items).filter((item) => {
-      const claimStatus = (item.status_klaim || "").toLowerCase();
-      const isClaimPending =
-        item.status_barang === "diklaim" ||
-        item.status_barang === "claim_pending" ||
-        claimStatus === "diproses" ||
-        (
-          !claimStatus &&
-          item.status_barang === "ditemukan" &&
-          pendingClaimedBarangIds.has(String(item.barang_id))
-        );
-
-      if (isClaimPending) {
-        return false;
-      }
-
       const matchesKeyword =
         !normalizedKeyword ||
         item.nama_barang?.toLowerCase().includes(normalizedKeyword) ||

@@ -290,7 +290,7 @@ class AdminAnalyticsPage extends Component {
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <h3 className="text-xl font-extrabold text-[#002B5B]">Tren Laporan</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Perbandingan laporan masuk dan barang ditemukan</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Perbandingan laporan masuk dan laporan selesai</p>
                   </div>
                   {/* Legenda Indikator Warna */}
                   <div className="flex gap-4 text-xs font-bold">
@@ -298,7 +298,7 @@ class AdminAnalyticsPage extends Component {
                       <span className="w-3 h-3 rounded-sm bg-[#A2B4C7]"></span> Dilaporkan
                     </span>
                     <span className="flex items-center gap-1.5 text-[#002B5B]">
-                      <span className="w-3 h-3 rounded-sm bg-[#8E793E]"></span> Ditemukan
+                      <span className="w-3 h-3 rounded-sm bg-[#8E793E]"></span> Laporan Selesai
                     </span>
                   </div>
                 </div>

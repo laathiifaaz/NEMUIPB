@@ -23,7 +23,6 @@ class VerificationReportPage extends Component {
     this.state = {
       reports: [],
       pickupNotifications: {},
-      claimStatuses: {},
       cancelClaimLoading: false,
       showCancelClaimModal: false,
       claimActionMessage: "",
@@ -34,13 +33,10 @@ class VerificationReportPage extends Component {
     };
   }
 
-  getStoredClaimStatuses = () => {
-    try {
-      return JSON.parse(localStorage.getItem("nemuipb_claim_status") || "{}");
-    } catch (error) {
-      return {};
-    }
-  };
+  getCurrentUserId() {
+    const currentUser = AuthService.getCurrentUser();
+    return currentUser?.user_id || currentUser?.id || null;
+  }
 
     handleSearch = (e) => {
     this.setState({
@@ -63,14 +59,12 @@ class VerificationReportPage extends Component {
   };
 
   componentDidMount() {
-    window.addEventListener("storage", this.handleClaimStorageChange);
-    window.addEventListener("focus", this.handleClaimStorageChange);
+    window.addEventListener("focus", this.loadReportData);
     this.loadReportData();
 }
 
   componentWillUnmount() {
-    window.removeEventListener("storage", this.handleClaimStorageChange);
-    window.removeEventListener("focus", this.handleClaimStorageChange);
+    window.removeEventListener("focus", this.loadReportData);
   }
 
   loadReportData = async () => {
@@ -94,15 +88,6 @@ class VerificationReportPage extends Component {
       const orderedReports = this.orderReports(reports);
       const params = new URLSearchParams(window.location.search);
       const targetLaporanId = params.get("laporan");
-      const storedClaimStatuses = this.getStoredClaimStatuses();
-      const latestClaimedLaporanId = Object.values(storedClaimStatuses)
-        .filter((claim) => claim?.status_klaim && claim.status_klaim !== "dibatalkan")
-        .sort((a, b) => {
-          const aTime = new Date(a.updated_at || 0).getTime();
-          const bTime = new Date(b.updated_at || 0).getTime();
-
-          return bTime - aTime;
-        })[0]?.laporan_id;
       const pickupNotifications = (Array.isArray(notifications) ? notifications : [])
         .filter((notification) =>
           /kode\s+(pickup|dropoff)(?:\s+anda)?\s*:/i.test(notification.pesan || "")
@@ -114,54 +99,21 @@ class VerificationReportPage extends Component {
 
           return acc;
         }, {});
-      const mergedReports = orderedReports.map((report) => {
-        const localClaim = storedClaimStatuses[report.laporan_id];
-
-        if (!localClaim) return report;
-
-        const apiUpdatedAt = new Date(
-          report.klaim_updated_time || report.updated_at || 0
-        ).getTime();
-        const localUpdatedAt = new Date(localClaim.updated_at || 0).getTime();
-
-        if (Number.isNaN(localUpdatedAt) || localUpdatedAt < apiUpdatedAt) {
-          return report;
-        }
-
-        return {
-          ...report,
-          status_klaim: localClaim.status_klaim,
-          klaim_id: localClaim.klaim_id || report.klaim_id,
-          klaim_updated_time: localClaim.updated_at,
-        };
-      });
 
       this.setState({
-        reports: mergedReports,
+        reports: orderedReports,
         pickupNotifications,
-        claimStatuses: storedClaimStatuses,
         selectedReport:
-          mergedReports.find(
+          orderedReports.find(
             (report) => String(report.laporan_id) === String(targetLaporanId)
           ) ||
-          (latestClaimedLaporanId
-            ? mergedReports.find(
-                (report) => String(report.laporan_id) === String(latestClaimedLaporanId)
-              )
-            : null) ||
-          (mergedReports.length > 0
-            ? mergedReports[0]
-            : null),
+          (orderedReports.length > 0 ? orderedReports[0] : null),
         loading: false,
       });
     } catch (error) {
       console.error(error);
       this.setState({ loading: false });
     }
-  };
-
-  handleClaimStorageChange = () => {
-    this.loadReportData();
   };
 
   renderStatusColor(status) {
@@ -318,17 +270,7 @@ class VerificationReportPage extends Component {
       };
     }
 
-    const localClaim = this.state.claimStatuses[report.laporan_id];
-    const localClaimStatus = (localClaim?.status_klaim || "").toLowerCase();
-    const apiClaimStatus = (report.status_klaim || "").toLowerCase();
-    const resolvedClaimStatus =
-      ["diproses", "diterima", "ditolak"].includes(localClaimStatus)
-        ? localClaimStatus
-        : apiClaimStatus;
-    const resolvedClaim =
-      ["diproses", "diterima", "ditolak"].includes(localClaimStatus)
-        ? localClaim
-        : null;
+    const resolvedClaimStatus = (report.status_klaim || "").toLowerCase();
 
     if (["diproses", "diterima", "ditolak"].includes(resolvedClaimStatus)) {
       return {
@@ -340,9 +282,9 @@ class VerificationReportPage extends Component {
             ? "Klaim disetujui"
             : "Klaim sedang diverifikasi",
         claim: {
-          klaim_id: resolvedClaim?.klaim_id || report.klaim_id,
+          klaim_id: report.klaim_id,
           laporan_id: report.laporan_id,
-          updated_at: resolvedClaim?.updated_at || report.klaim_updated_time,
+          updated_at: report.klaim_updated_time,
           status_klaim: resolvedClaimStatus,
         },
       };
@@ -403,7 +345,7 @@ class VerificationReportPage extends Component {
   };
 
   handleCancelClaim = async () => {
-    const { selectedReport, claimStatuses } = this.state;
+    const { selectedReport } = this.state;
     const selectedClaimStatus = this.getClaimStatusForReport(selectedReport);
     const klaimId = selectedClaimStatus?.claim?.klaim_id;
 
@@ -416,13 +358,6 @@ class VerificationReportPage extends Component {
 
     try {
       await BarangService.batalkanKlaim(klaimId);
-
-      const updatedClaimStatuses = { ...claimStatuses };
-      delete updatedClaimStatuses[selectedReport.laporan_id];
-      localStorage.setItem(
-        "nemuipb_claim_status",
-        JSON.stringify(updatedClaimStatuses)
-      );
       const refreshedReports = await ReportService.getMyReports();
       const orderedReports = this.orderReports(refreshedReports || []);
       const refreshedSelectedReport =
@@ -435,10 +370,9 @@ class VerificationReportPage extends Component {
       this.setState({
         reports: refreshedReports || [],
         selectedReport: refreshedSelectedReport,
-        claimStatuses: updatedClaimStatuses,
         cancelClaimLoading: false,
         showCancelClaimModal: false,
-        claimActionMessage: "Klaim barang berhasil dibatalkan.",
+        claimActionMessage: "",
       });
     } catch (error) {
       this.setState({
@@ -460,7 +394,6 @@ class VerificationReportPage extends Component {
       selectedReport,
       cancelClaimLoading,
       showCancelClaimModal,
-      claimActionMessage,
       loading,
     } = this.state;
     const selectedPickupNotification =
@@ -1207,12 +1140,6 @@ class VerificationReportPage extends Component {
                     </div>
                   )}
 
-                  {claimActionMessage && (
-                    <div className="mt-3 bg-blue-50 text-[#1D4ED8] rounded-2xl px-4 py-3 text-xs font-bold">
-                      {claimActionMessage}
-                    </div>
-                  )}
-
                   {!selectedIsFindingReport &&
                     selectedClaimStatus &&
                     selectedClaimStatus.status === "diproses" &&
@@ -1297,7 +1224,7 @@ class VerificationReportPage extends Component {
                         transition-all
                       "
                     >
-                      Klaim Barang Lagi
+                      Klaim Barang
                     </button>
                   )}
 

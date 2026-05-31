@@ -43,7 +43,7 @@ const ReportTrendChart = ({ data = [], heightClass = "h-72" }) => {
                   style={{ height: `${Math.max(returnedHeight, item.returned ? 6 : 0)}%` }}
                 ></div>
                 <span className="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#0B2B5B] px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                  Ditemukan: {item.returned || 0}
+                  Laporan Selesai: {item.returned || 0}
                 </span>
               </div>
             </div>

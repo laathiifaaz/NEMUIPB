@@ -50,16 +50,23 @@ def get_admin_analytics(db, time_range="30_hari", location_filter="tinggi"):
         for laporan, barang in report_rows
         if _is_in_range(_item_datetime(barang), previous_start, previous_end)
     ]
+    verified_reports = [
+        (laporan, barang)
+        for laporan, barang in report_rows
+        if laporan.status_verifikasi == "terverifikasi"
+    ]
 
     found_reports = [
         (laporan, barang)
         for laporan, barang in current_reports
         if laporan.jenis_laporan == "penemuan"
+        and laporan.status_verifikasi == "terverifikasi"
     ]
     previous_found_reports = [
         (laporan, barang)
         for laporan, barang in previous_reports
         if laporan.jenis_laporan == "penemuan"
+        and laporan.status_verifikasi == "terverifikasi"
     ]
     returned_reports = [
         (laporan, barang)
@@ -85,7 +92,7 @@ def get_admin_analytics(db, time_range="30_hari", location_filter="tinggi"):
             "avg_return_time": _format_hours(avg_return_hours),
             "return_trend": _format_hour_trend(avg_return_hours, previous_avg_return_hours),
         },
-        "monthlyTrends": _build_monthly_trends(report_rows, now),
+        "monthlyTrends": _build_monthly_trends(verified_reports, now),
         "categories": _build_categories(current_reports),
         "hotspots": _build_hotspots(current_reports, location_filter),
     }

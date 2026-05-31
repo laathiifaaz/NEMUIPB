@@ -214,6 +214,15 @@ class DashboardPage extends Component {
             <div className="col-span-3 flex justify-center py-16">
               <i className="fas fa-spinner fa-spin text-3xl text-[#002B5B]"></i>
             </div>
+          ) : recentItems.length === 0 ? (
+            <div className="col-span-3 rounded-[24px] border border-dashed border-gray-200 bg-white px-6 py-10 text-center">
+              <p className="text-lg font-bold text-[#002B5B] mb-2">
+                Belum ada barang terbaru
+              </p>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Barang penemuan atau kehilangan yang sudah diverifikasi admin akan tampil di sini.
+              </p>
+            </div>
           ) : (
             recentItems.map((item) => (
               <div

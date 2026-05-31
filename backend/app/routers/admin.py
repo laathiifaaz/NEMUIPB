@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import case
 
 from app.database import SessionLocal
-from app.models import User, Barang, Laporan, Notifikasi, KlaimBarang
+from app.models import User, Barang, Laporan, Notifikasi, KlaimBarang, SerahTerima, ActivityLog
 from app.schemas import VerifikasiLaporan, UpdateStatusBarang, VerifikasiKlaim, VerifikasiPickup
 from app.services.admin_activity_service import (
     create_activity_log,
@@ -26,6 +26,17 @@ def ensure_admin(current_user: User):
             status_code=403,
             detail="Akses ditolak. User bukan admin"
         )
+
+
+PICKUP_CODE_PREFIX = "PICKUP:"
+
+
+def _extract_pickup_code(value):
+    if not value or PICKUP_CODE_PREFIX not in value:
+        return None
+
+    raw_code = value.split(PICKUP_CODE_PREFIX, 1)[1].split("|", 1)[0]
+    return raw_code.strip().upper()
     
 @router.get("/laporan")
 def get_all_laporan(
@@ -165,6 +176,61 @@ def get_pending_klaim(
     db.close()
 
     return result
+
+
+@router.get("/klaim/history")
+def get_claim_history(
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    try:
+        data = (
+            db.query(KlaimBarang, Barang, User, Laporan)
+            .join(Barang, KlaimBarang.barang_id == Barang.barang_id)
+            .join(User, KlaimBarang.user_id == User.user_id)
+            .join(Laporan, KlaimBarang.laporan_kehilangan_id == Laporan.laporan_id)
+            .filter(KlaimBarang.status_klaim.in_(["diterima", "ditolak"]))
+            .order_by(
+                KlaimBarang.updated_time.desc().nullslast(),
+                KlaimBarang.created_time.desc().nullslast(),
+                KlaimBarang.klaim_id.desc(),
+            )
+            .all()
+        )
+
+        result = []
+
+        for klaim, barang, user, laporan in data:
+            verified_at = klaim.updated_time or klaim.created_time
+
+            result.append({
+                "klaim_id": klaim.klaim_id,
+                "user_id": user.user_id,
+                "pengklaim": user.nama,
+                "email": user.email,
+                "barang_id": barang.barang_id,
+                "nama_barang": barang.nama_barang,
+                "kategori": barang.kategori,
+                "lokasi": barang.lokasi,
+                "laporan_id": laporan.laporan_id,
+                "laporan_kehilangan_id": laporan.laporan_id,
+                "status_klaim": klaim.status_klaim,
+                "status_laporan": laporan.status_laporan,
+                "status_barang": barang.status_barang,
+                "created_time": klaim.created_time,
+                "updated_time": klaim.updated_time,
+                "claim_verified_at": verified_at,
+                "catatan_admin": encryption_service.decrypt_if_exists(
+                    klaim.catatan_admin
+                ),
+            })
+
+        return result
+    finally:
+        db.close()
 
 @router.patch("/laporan/{laporan_id}/setujui")
 def setujui_laporan(
@@ -337,12 +403,16 @@ def get_admin_dashboard_summary(
 
     db = SessionLocal()
 
-    active_lost = db.query(Barang).filter(
-        Barang.status_barang == "hilang"
+    active_lost = db.query(Laporan).join(Barang, Laporan.barang_id == Barang.barang_id).filter(
+        Laporan.jenis_laporan == "kehilangan",
+        Laporan.status_verifikasi == "terverifikasi",
+        Laporan.status_laporan != "selesai"
     ).count()
 
-    total_found = db.query(Barang).filter(
-        Barang.status_barang.in_(["ditemukan", "diklaim", "selesai"])
+    total_found = db.query(Laporan).join(Barang, Laporan.barang_id == Barang.barang_id).filter(
+        Laporan.jenis_laporan == "penemuan",
+        Laporan.status_verifikasi == "terverifikasi",
+        Laporan.status_laporan != "selesai"
     ).count()
 
     pending_verification = db.query(Laporan).filter(
@@ -397,6 +467,59 @@ def verify_pickup(
     except KlaimServiceError as error:
         db.rollback()
         raise HTTPException(status_code=error.status_code, detail=error.detail)
+    finally:
+        db.close()
+
+
+@router.get("/serah-terima/history")
+def get_serah_terima_history(
+    current_user: User = Depends(get_current_user)
+):
+    ensure_admin(current_user)
+
+    db = SessionLocal()
+
+    try:
+        data = (
+            db.query(ActivityLog, SerahTerima, KlaimBarang, Barang, User, Laporan)
+            .join(SerahTerima, ActivityLog.klaim_id == SerahTerima.klaim_id)
+            .join(KlaimBarang, ActivityLog.klaim_id == KlaimBarang.klaim_id)
+            .join(Barang, ActivityLog.barang_id == Barang.barang_id)
+            .join(User, KlaimBarang.user_id == User.user_id)
+            .join(Laporan, KlaimBarang.laporan_kehilangan_id == Laporan.laporan_id)
+            .filter(
+                ActivityLog.action_type == "returned",
+                KlaimBarang.status_klaim == "diterima",
+                Barang.status_barang == "selesai",
+            )
+            .order_by(ActivityLog.created_at.desc())
+            .all()
+        )
+
+        result = []
+
+        for log, serah_terima, klaim, barang, user, laporan in data:
+            pickup_code = _extract_pickup_code(
+                encryption_service.decrypt_if_exists(klaim.catatan_admin)
+            )
+
+            result.append({
+                "serah_terima_id": serah_terima.serah_terima_id,
+                "code": pickup_code or "-",
+                "code_type": "pickup",
+                "message": log.note,
+                "klaim_id": klaim.klaim_id,
+                "barang_id": barang.barang_id,
+                "laporan_id": laporan.laporan_id,
+                "laporan_kehilangan_id": laporan.laporan_id,
+                "status_barang": barang.status_barang,
+                "pengklaim": user.nama,
+                "email": user.email,
+                "verified_at": log.created_at,
+                "created_at": serah_terima.created_at,
+            })
+
+        return result
     finally:
         db.close()
 

@@ -19,9 +19,10 @@ class AdminVerificationPage extends Component {
       reports: [],
       filteredReports: [],
       pendingClaims: [],
-      claimHistory: this.getStoredClaimHistory(),
+      claimHistory: [],
       loading: true,
       claimsLoading: true,
+      claimHistoryLoading: true,
       search: "",
       currentPage: 1,
       reportsPerPage: 6,
@@ -103,26 +104,20 @@ class AdminVerificationPage extends Component {
     await Promise.all([
       this.fetchReports(),
       this.fetchPendingClaims(),
+      this.fetchClaimHistory(),
     ]);
 
-    window.addEventListener("storage", this.handleClaimStorageChange);
-    window.addEventListener("focus", this.handleClaimStorageChange);
+    window.addEventListener("focus", this.handleVerificationFocus);
   }
 
   componentWillUnmount() {
-    window.removeEventListener("storage", this.handleClaimStorageChange);
-    window.removeEventListener("focus", this.handleClaimStorageChange);
+    window.removeEventListener("focus", this.handleVerificationFocus);
   }
 
-  handleClaimStorageChange = () => {
-    this.setState(
-      {
-        claimHistory: this.getStoredClaimHistory(),
-      },
-      () => {
-        this.fetchPendingClaims();
-      }
-    );
+  handleVerificationFocus = () => {
+    this.fetchReports();
+    this.fetchPendingClaims();
+    this.fetchClaimHistory();
   };
 
   toggleSidebar = () => {
@@ -291,63 +286,34 @@ class AdminVerificationPage extends Component {
     }, 3000);
   };
 
-  getStoredClaimHistory() {
+  fetchClaimHistory = async () => {
+    this.setState({ claimHistoryLoading: true });
+
     try {
-      return JSON.parse(
-        localStorage.getItem("nemuipb_admin_claim_history") || "[]"
-      );
+      const data = await AdminService.getClaimHistory();
+
+      this.setState({
+        claimHistory: Array.isArray(data) ? data : [],
+        claimHistoryLoading: false,
+      });
     } catch (error) {
-      return [];
+      console.log(error);
+
+      this.setState({
+        claimHistory: [],
+        claimHistoryLoading: false,
+      });
     }
   }
 
-  saveClaimHistoryRecord(claim, statusKlaim) {
-    const record = {
-      ...claim,
-      status_klaim: statusKlaim,
-      claim_verified_at: new Date().toISOString(),
-      barang_detail: this.state.selectedClaimItemDetail
-        ? { ...this.state.selectedClaimItemDetail }
-        : null,
-      laporan_detail: this.state.selectedClaimLostReport
-        ? { ...this.state.selectedClaimLostReport }
-        : null,
-    };
-    const nextHistory = [
-      record,
-      ...this.state.claimHistory.filter(
-        (item) => String(item.klaim_id) !== String(claim.klaim_id)
-      ),
-    ];
-
-    localStorage.setItem(
-      "nemuipb_admin_claim_history",
-      JSON.stringify(nextHistory)
-    );
-
-    try {
-      const storedClaimStatuses = JSON.parse(
-        localStorage.getItem("nemuipb_claim_status") || "{}"
+  hasAcceptedClaimForBarang(barangId, currentKlaimId = null) {
+    return this.state.claimHistory.some((item) => {
+      return (
+        String(item.barang_id) === String(barangId) &&
+        String(item.klaim_id) !== String(currentKlaimId) &&
+        (item.status_klaim || "").toLowerCase() === "diterima"
       );
-
-      storedClaimStatuses[String(claim.laporan_kehilangan_id)] = {
-        ...(storedClaimStatuses[String(claim.laporan_kehilangan_id)] || {}),
-        barang_id: claim.barang_id,
-        laporan_id: claim.laporan_kehilangan_id,
-        klaim_id: claim.klaim_id,
-        status_klaim: statusKlaim,
-        updated_at: new Date().toISOString(),
-      };
-
-      localStorage.setItem(
-        "nemuipb_claim_status",
-        JSON.stringify(storedClaimStatuses)
-      );
-    } catch (error) {
-      // Ignore storage write failures.
-    }
-
-    return nextHistory;
+    });
   }
 
   toggleExportMenu = () => {
@@ -490,9 +456,7 @@ class AdminVerificationPage extends Component {
 
   handleDownloadClaimsCsv = () => {
     const claimHistory = Array.isArray(this.state.claimHistory)
-      ? this.state.claimHistory.filter((claim) =>
-          ["diterima", "ditolak"].includes(claim.status_klaim)
-        )
+      ? [...this.state.claimHistory]
       : [];
 
     this.downloadCsv(
@@ -541,6 +505,17 @@ class AdminVerificationPage extends Component {
       ? "Klaim diterima admin. Kode pickup dibuat otomatis oleh sistem."
       : "Klaim ditolak admin.";
 
+    if (
+      isAccepted &&
+      this.hasAcceptedClaimForBarang(claim.barang_id, claim.klaim_id)
+    ) {
+      this.showPopup(
+        "error",
+        "Barang ini sudah pernah diverifikasi klaim barang ke orang lain."
+      );
+      return;
+    }
+
     try {
       this.setState({ claimActionLoading: true });
 
@@ -549,17 +524,15 @@ class AdminVerificationPage extends Component {
         statusKlaim,
         catatanAdmin
       );
+      await Promise.all([
+        this.fetchPendingClaims(),
+        this.fetchClaimHistory(),
+      ]);
 
-      const nextClaimHistory = this.saveClaimHistoryRecord(claim, statusKlaim);
-
-      this.setState((prevState) => ({
-        pendingClaims: prevState.pendingClaims.filter(
-          (item) => item.klaim_id !== claim.klaim_id
-        ),
-        claimHistory: nextClaimHistory,
+      this.setState({
         claimHistoryCurrentPage: 1,
         claimActionLoading: false,
-      }));
+      });
 
       this.showPopup(
         isAccepted ? "success" : "error",
@@ -650,6 +623,21 @@ class AdminVerificationPage extends Component {
   };
 
   openClaimActionConfirmModal = (action) => {
+    if (
+      action === "diterima" &&
+      this.state.selectedClaim &&
+      this.hasAcceptedClaimForBarang(
+        this.state.selectedClaim.barang_id,
+        this.state.selectedClaim.klaim_id
+      )
+    ) {
+      this.showPopup(
+        "error",
+        "Barang ini sudah pernah diverifikasi klaim barang ke orang lain."
+      );
+      return;
+    }
+
     this.setState({
       selectedClaimAction: action,
       showClaimActionConfirmModal: true,
@@ -968,42 +956,48 @@ class AdminVerificationPage extends Component {
     if (!showApproveModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-[24px] w-full max-w-sm p-6 text-center shadow-2xl">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#EEF4FF] flex items-center justify-center">
-            <i className="fas fa-check text-[#163A70] text-xl"></i>
+      <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center px-4 py-6">
+        <div className="bg-white rounded-[20px] w-full max-w-sm px-6 pt-9 pb-6 text-center shadow-2xl relative">
+          <button
+            type="button"
+            onClick={this.closeApproveModal}
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+          >
+            <i className="fas fa-times text-sm"></i>
+          </button>
+
+          <div className="mx-auto mb-4 w-12 h-12 rounded-2xl bg-[#FFD75A] text-white flex items-center justify-center text-2xl font-black">
+            ?
           </div>
 
-          <h2 className="text-xl font-extrabold text-[#102348] mb-2">
+          <h2 className="text-2xl font-extrabold text-black mb-3">
             Verifikasi Laporan?
           </h2>
 
-          <p className="text-sm text-gray-500 leading-relaxed mb-6">
-            Laporan yang diverifikasi akan langsung disetujui oleh admin.
+          <p className="text-gray-500 text-sm leading-relaxed mb-6">
+            Laporan yang disetujui tidak dapat diubah.
           </p>
 
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={this.closeApproveModal}
-              className="py-3 rounded-xl bg-[#EEF2F7] text-[#163A70] text-sm font-bold"
+              className="py-3 rounded-xl bg-[#E8EEF5] text-[#002B5B] font-extrabold text-sm"
             >
-              Batal
+              Tidak
             </button>
 
             <button
               onClick={() =>
-                this.handleApprove(
-                  this.state.selectedApproveId
-                )
+                this.handleApprove(this.state.selectedApproveId)
               }
               disabled={processingVerification}
-              className={`py-3 rounded-xl text-white text-sm font-bold ${
+              className={`py-3 rounded-xl text-white font-extrabold text-sm ${
                 processingVerification
                   ? "bg-gray-300 cursor-not-allowed"
-                  : "bg-[#163A70]"
+                  : "bg-[#002B5B]"
               }`}
             >
-              {processingVerification ? "Memproses..." : "Ya, Verifikasi"}
+              {processingVerification ? "Memproses..." : "Ya"}
             </button>
           </div>
         </div>
@@ -1022,66 +1016,72 @@ class AdminVerificationPage extends Component {
     if (!showRejectModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-[28px] w-full max-w-lg p-8 shadow-2xl">
-          <h2 className="text-2xl font-extrabold text-[#102348] mb-2">
-            Tolak Laporan
+      <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center px-4 py-6">
+        <div className="bg-white rounded-[20px] w-full max-w-sm px-6 pt-9 pb-6 text-center shadow-2xl relative">
+          <button
+            type="button"
+            onClick={this.closeRejectModal}
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+          >
+            <i className="fas fa-times text-sm"></i>
+          </button>
+
+          <div className="mx-auto mb-4 w-12 h-12 rounded-2xl bg-[#FFD75A] text-white flex items-center justify-center text-2xl font-black">
+            ?
+          </div>
+
+          <h2 className="text-2xl font-extrabold text-black mb-3">
+            Tolak Laporan?
           </h2>
 
-          <p className="text-sm text-gray-500 mb-6">
-            Berikan alasan penolakan laporan.
+          <p className="text-gray-500 text-sm leading-relaxed mb-5">
+            Laporan yang ditolak tidak dapat diubah.
           </p>
 
-          <textarea
-            value={rejectNote}
-            onChange={(e) =>
-              this.setState({
-                rejectNote: e.target.value,
-                errorReject: "",
-              })
-            }
-            rows="5"
-            placeholder="Masukkan alasan penolakan..."
-            className={`
-              w-full
-              rounded-2xl
-              border
-              p-4
-              text-sm
-              outline-none
-              resize-none
-              ${
-                errorReject
-                  ? "border-red-400"
-                  : "border-[#DCE4EE]"
+          <div className="mb-5 text-left">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+              Catatan Penolakan
+            </label>
+            <textarea
+              value={rejectNote}
+              onChange={(e) =>
+                this.setState({
+                  rejectNote: e.target.value,
+                  errorReject: "",
+                })
               }
-            `}
-          />
+              rows={3}
+              placeholder="Tulis alasan penolakan di sini"
+              className={`w-full rounded-2xl border bg-[#F8FAFC] px-4 py-3 text-sm text-[#002B5B] outline-none resize-none focus:border-[#163A70] ${
+                errorReject ? "border-red-400" : "border-[#E7ECF3]"
+              }`}
+            />
 
-          {errorReject && (
-            <p className="text-red-500 text-xs mt-2 font-semibold">
-              {errorReject}
-            </p>
-          )}
+            {errorReject && (
+              <p className="mt-2 text-xs font-bold text-red-500">
+                {errorReject}
+              </p>
+            )}
+          </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-6">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={this.closeRejectModal}
-              className="py-3 rounded-xl bg-[#EEF2F7] text-[#163A70] text-sm font-bold"
+              className="py-3 rounded-xl bg-[#E8EEF5] text-[#002B5B] font-extrabold text-sm"
             >
-              Batal
+              Tidak
             </button>
 
             <button
               onClick={this.handleReject}
               disabled={processingVerification}
-              className={`py-3 rounded-xl text-white text-sm font-bold ${
+              className={`py-3 rounded-xl text-white font-extrabold text-sm ${
                 processingVerification
                   ? "bg-gray-300 cursor-not-allowed"
                   : "bg-[#D92D20]"
               }`}
             >
-              {processingVerification ? "Memproses..." : "Tolak Laporan"}
+              {processingVerification ? "Memproses..." : "Ya, Tolak"}
             </button>
           </div>
         </div>
@@ -2025,33 +2025,33 @@ class AdminVerificationPage extends Component {
                   <button
                     disabled={actionDisabled}
                     onClick={() =>
-                      this.openRejectModal(
-                        selectedReport.laporan_id
-                      )
-                    }
-                    className={`px-6 py-3 rounded-lg text-xs font-bold ${
-                      actionDisabled
-                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                        : "bg-[#C9181F] text-white"
-                    }`}
-                    >
-                      Tolak
-                    </button>
-
-                  <button
-                    disabled={actionDisabled}
-                    onClick={() =>
                       this.openApproveModal(
                         selectedReport.laporan_id
                       )
                     }
-                    className={`px-6 py-3 rounded-lg text-xs font-bold ${
+                    className={`px-5 py-3 rounded-xl text-xs font-bold transition-all ${
                       actionDisabled
-                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                        : "bg-[#002B5B] text-white"
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-[#163A70] text-white hover:bg-[#102348]"
                     }`}
                   >
                     Setujui
+                  </button>
+
+                  <button
+                    disabled={actionDisabled}
+                    onClick={() =>
+                      this.openRejectModal(
+                        selectedReport.laporan_id
+                      )
+                    }
+                    className={`px-5 py-3 rounded-xl text-xs font-bold transition-all ${
+                      actionDisabled
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-red-50 text-red-600 hover:bg-red-100"
+                    }`}
+                  >
+                    Tolak
                   </button>
                 </div>
               </div>
@@ -2125,17 +2125,20 @@ class AdminVerificationPage extends Component {
     const rejectedCount = filteredReports.filter(
       (r) => r.status_verifikasi === "ditolak"
     ).length;
-    const claimedHistoryReports = this.state.claimHistory
-      .filter((claim) =>
-      ["diterima", "ditolak"].includes(claim.status_klaim)
-      )
+    const claimedHistoryReports = Array.isArray(this.state.claimHistory)
+      ? [...this.state.claimHistory]
       .sort((a, b) => {
         const left = new Date(b.claim_verified_at || b.updated_time || b.created_time || 0).getTime();
         const right = new Date(a.claim_verified_at || a.updated_time || a.created_time || 0).getTime();
 
         return left - right;
-      });
-    const { claimHistoryCurrentPage, claimHistoryPerPage } = this.state;
+      })
+      : [];
+    const {
+      claimHistoryCurrentPage,
+      claimHistoryPerPage,
+      claimHistoryLoading,
+    } = this.state;
     const totalClaimHistoryPages = Math.max(
       1,
       Math.ceil(claimedHistoryReports.length / claimHistoryPerPage)
@@ -2354,7 +2357,7 @@ class AdminVerificationPage extends Component {
                     Histori Klaim Barang
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Barang dan laporan yang klaimnya sudah diterima atau selesai dikembalikan.
+                    Semua pengajuan klaim yang sudah diproses admin.
                   </p>
                 </div>
 
@@ -2374,7 +2377,11 @@ class AdminVerificationPage extends Component {
                 </div>
               </div>
 
-              {claimedHistoryReports.length === 0 ? (
+              {claimHistoryLoading ? (
+                <div className="bg-[#F8FAFC] rounded-2xl px-5 py-6 text-sm text-gray-400 font-semibold">
+                  Memuat histori klaim...
+                </div>
+              ) : claimedHistoryReports.length === 0 ? (
                 <div className="bg-[#F8FAFC] rounded-2xl px-5 py-6 text-sm text-gray-400 font-semibold">
                   Belum ada histori klaim barang.
                 </div>
@@ -2891,46 +2898,9 @@ class AdminVerificationPage extends Component {
                             ID: #IPB-{report.laporan_id}
                           </p>
 
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <button
-                              onClick={() => this.openDetailModal(report)}
-                              className="
-                                px-4
-                                py-2
-                                rounded-xl
-                                border
-                                border-[#D6E2F0]
-                                text-[#163A70]
-                                text-xs
-                                font-bold
-                                hover:bg-[#F5F7FB]
-                                transition-all
-                              "
-                            >
-                              Detail
-                            </button>
-
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                             {report.status_verifikasi === "belum_diverifikasi" && (
                               <>
-                                <button
-                                  onClick={() =>
-                                    this.openRejectModal(report.laporan_id)
-                                  }
-                                  className="
-                                    px-4
-                                    py-2
-                                    rounded-xl
-                                    bg-[#FFF1F1]
-                                    text-[#D92D20]
-                                    text-xs
-                                    font-bold
-                                    hover:bg-[#FFE5E5]
-                                    transition-all
-                                  "
-                                >
-                                  Tolak
-                                </button>
-
                                 <button
                                   onClick={() =>
                                     this.openApproveModal(report.laporan_id)
@@ -2948,6 +2918,25 @@ class AdminVerificationPage extends Component {
                                   "
                                 >
                                   Setujui
+                                </button>
+
+                                <button
+                                  onClick={() =>
+                                    this.openRejectModal(report.laporan_id)
+                                  }
+                                  className="
+                                    px-4
+                                    py-2
+                                    rounded-xl
+                                    bg-[#FFF1F1]
+                                    text-[#D92D20]
+                                    text-xs
+                                    font-bold
+                                    hover:bg-[#FFE5E5]
+                                    transition-all
+                                  "
+                                >
+                                  Tolak
                                 </button>
                               </>
                             )}
@@ -2980,6 +2969,47 @@ class AdminVerificationPage extends Component {
                               ">
                                 Ditolak
                               </div>
+                            )}
+
+                            {(report.status_verifikasi === "terverifikasi" ||
+                              report.status_verifikasi === "ditolak") && (
+                              <button
+                                onClick={() => this.openDetailModal(report)}
+                                className="
+                                  px-4
+                                  py-2
+                                  rounded-xl
+                                  border
+                                  border-[#D6E2F0]
+                                  text-[#163A70]
+                                  text-xs
+                                  font-bold
+                                  hover:bg-[#F5F7FB]
+                                  transition-all
+                                "
+                              >
+                                Detail
+                              </button>
+                            )}
+
+                            {report.status_verifikasi === "belum_diverifikasi" && (
+                              <button
+                                onClick={() => this.openDetailModal(report)}
+                                className="
+                                  px-4
+                                  py-2
+                                  rounded-xl
+                                  border
+                                  border-[#D6E2F0]
+                                  text-[#163A70]
+                                  text-xs
+                                  font-bold
+                                  hover:bg-[#F5F7FB]
+                                  transition-all
+                                "
+                              >
+                                Detail
+                              </button>
                             )}
                           </div>
                         </div>

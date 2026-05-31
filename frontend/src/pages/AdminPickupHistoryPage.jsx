@@ -15,7 +15,10 @@ class AdminPickupHistoryPage extends Component {
     super(props);
 
     this.state = {
-      pickupHistory: this.getStoredPickupHistory(),
+      pickupHistory: [],
+      pickupHistoryCurrentPage: 1,
+      pickupHistoryPerPage: 10,
+      pickupHistoryLoading: true,
       isSidebarExpanded: getStoredSidebarExpanded(),
       showPickupHistoryDetailModal: false,
       selectedPickupHistory: null,
@@ -34,19 +37,16 @@ class AdminPickupHistoryPage extends Component {
       return;
     }
 
-    window.addEventListener("storage", this.handleStorageChange);
+    this.fetchPickupHistory();
+    window.addEventListener("focus", this.handleFocusChange);
   }
 
   componentWillUnmount() {
-    window.removeEventListener("storage", this.handleStorageChange);
+    window.removeEventListener("focus", this.handleFocusChange);
   }
 
-  handleStorageChange = (event) => {
-    if (event.key === "nemuipb_admin_pickup_history") {
-      this.setState({
-        pickupHistory: this.getStoredPickupHistory(),
-      });
-    }
+  handleFocusChange = () => {
+    this.fetchPickupHistory();
   };
 
   toggleSidebar = () => {
@@ -116,6 +116,12 @@ class AdminPickupHistoryPage extends Component {
     });
   };
 
+  setPickupHistoryPage = (page) => {
+    this.setState({
+      pickupHistoryCurrentPage: page,
+    });
+  };
+
   goToDashboard = () => {
     if (this.props.navigate) {
       this.props.navigate("/admin");
@@ -125,17 +131,26 @@ class AdminPickupHistoryPage extends Component {
     window.location.href = "/admin";
   };
 
-  getStoredPickupHistory() {
-    try {
-      const history = JSON.parse(
-        localStorage.getItem("nemuipb_admin_pickup_history") || "[]"
-      );
+  fetchPickupHistory = async () => {
+    this.setState({ pickupHistoryLoading: true });
 
-      return Array.isArray(history) ? history : [];
+    try {
+      const data = await AdminService.getPickupHistory();
+
+      this.setState({
+        pickupHistory: Array.isArray(data) ? data : [],
+        pickupHistoryCurrentPage: 1,
+        pickupHistoryLoading: false,
+      });
     } catch (error) {
-      return [];
+      console.log(error);
+
+      this.setState({
+        pickupHistory: [],
+        pickupHistoryLoading: false,
+      });
     }
-  }
+  };
 
   formatDateTime(value) {
     if (!value) return "-";
@@ -179,6 +194,9 @@ class AdminPickupHistoryPage extends Component {
   render() {
     const {
       pickupHistory,
+      pickupHistoryCurrentPage,
+      pickupHistoryPerPage,
+      pickupHistoryLoading,
       isSidebarExpanded,
       showPickupHistoryDetailModal,
       selectedPickupHistory,
@@ -193,6 +211,20 @@ class AdminPickupHistoryPage extends Component {
 
       return left - right;
     });
+    const totalPickupHistoryPages = Math.max(
+      1,
+      Math.ceil(sortedHistory.length / pickupHistoryPerPage)
+    );
+    const safePickupHistoryPage = Math.min(
+      pickupHistoryCurrentPage,
+      totalPickupHistoryPages
+    );
+    const pickupHistoryStartIndex =
+      (safePickupHistoryPage - 1) * pickupHistoryPerPage;
+    const paginatedPickupHistory = sortedHistory.slice(
+      pickupHistoryStartIndex,
+      pickupHistoryStartIndex + pickupHistoryPerPage
+    );
 
     return (
       <div className="min-h-screen bg-[#F6F7FB] font-['Plus_Jakarta_Sans'] text-[#002B5B]">
@@ -279,7 +311,14 @@ class AdminPickupHistoryPage extends Component {
               </div>
             </div>
 
-            {sortedHistory.length === 0 ? (
+            {pickupHistoryLoading ? (
+              <div className="bg-white rounded-[28px] p-16 text-center border border-[#E7ECF3]">
+                <i className="fas fa-spinner fa-spin text-5xl text-gray-300 mb-4"></i>
+                <p className="text-gray-400 font-semibold">
+                  Memuat riwayat serah terima...
+                </p>
+              </div>
+            ) : sortedHistory.length === 0 ? (
               <div className="bg-white rounded-[28px] p-16 text-center border border-[#E7ECF3]">
                 <i className="fas fa-inbox text-5xl text-gray-300 mb-4"></i>
                 <p className="text-gray-400 font-semibold">
@@ -288,7 +327,7 @@ class AdminPickupHistoryPage extends Component {
               </div>
             ) : (
               <div className="space-y-3">
-                {sortedHistory.map((item, index) => (
+                {paginatedPickupHistory.map((item, index) => (
                   <div
                     key={`${item.code}-${item.verified_at || index}`}
                     className="bg-white border border-[#E7ECF3] rounded-[22px] p-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
@@ -332,6 +371,56 @@ class AdminPickupHistoryPage extends Component {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {sortedHistory.length > pickupHistoryPerPage && (
+              <div className="flex items-center justify-between gap-4 mt-6 text-xs text-gray-500">
+                <p>
+                  Menampilkan{" "}
+                  {sortedHistory.length === 0 ? 0 : pickupHistoryStartIndex + 1}
+                  -
+                  {Math.min(
+                    pickupHistoryStartIndex + pickupHistoryPerPage,
+                    sortedHistory.length
+                  )}{" "}
+                  dari {sortedHistory.length} riwayat
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      this.setPickupHistoryPage(
+                        Math.max(1, safePickupHistoryPage - 1)
+                      )
+                    }
+                    disabled={safePickupHistoryPage === 1}
+                    className="w-9 h-9 rounded-xl border border-[#E7ECF3] bg-white text-[#163A70] font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] transition-all"
+                  >
+                    â€¹
+                  </button>
+
+                  <span className="text-[11px] font-bold text-[#163A70] px-2">
+                    {safePickupHistoryPage} / {totalPickupHistoryPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      this.setPickupHistoryPage(
+                        Math.min(
+                          totalPickupHistoryPages,
+                          safePickupHistoryPage + 1
+                        )
+                      )
+                    }
+                    disabled={safePickupHistoryPage === totalPickupHistoryPages}
+                    className="w-9 h-9 rounded-xl border border-[#E7ECF3] bg-white text-[#163A70] font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F5F7FB] transition-all"
+                  >
+                    â€º
+                  </button>
+                </div>
               </div>
             )}
 
