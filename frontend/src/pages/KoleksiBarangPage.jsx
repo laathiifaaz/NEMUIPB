@@ -147,7 +147,7 @@ class KoleksiBarangPage extends Component {
           return item.status_laporan === "selesai";
         }
 
-        return ["disetujui", "siap_diambil", "selesai"].includes(
+        return ["disetujui", "selesai"].includes(
           item.status_laporan
         );
       }
@@ -202,7 +202,6 @@ class KoleksiBarangPage extends Component {
     }
     if (item.status_barang === "ditemukan") return "ditemukan";
     if (item.status_barang === "hilang") return "hilang";
-    if (item.status_laporan === "siap_diambil") return "selesai";
     return "selesai";
   }
 
@@ -222,7 +221,6 @@ class KoleksiBarangPage extends Component {
       return "Hilang";
     }
 
-    if (item.status_laporan === "siap_diambil") return "Selesai";
     if (item.status_barang === "hilang") return "Hilang";
     return "Tanggal";
   }

@@ -47,8 +47,9 @@ class DashboardPage extends Component {
       const data = await BarangService.getAllBarang();
       const items = Array.isArray(data) ? data : [];
       const verifiedItems = this.getVisibleUserItems(items);
+      const activeRecentItems = this.getActiveRecentItems(items);
 
-      const sortedItems = verifiedItems
+      const sortedItems = activeRecentItems
         .sort(
           (a, b) => {
             const priorityDiff =
@@ -101,8 +102,9 @@ class DashboardPage extends Component {
       const data = await BarangService.getAllBarang();
       const items = Array.isArray(data) ? data : [];
       const verifiedItems = this.getVisibleUserItems(items);
+      const activeRecentItems = this.getActiveRecentItems(items);
 
-      const sortedItems = [...verifiedItems]
+      const sortedItems = [...activeRecentItems]
         .sort((a, b) => {
           const priorityDiff = this.getRecentItemPriority(a) - this.getRecentItemPriority(b);
 
@@ -158,9 +160,33 @@ class DashboardPage extends Component {
         return item.status_laporan === "selesai";
       }
 
-      return ["disetujui", "siap_diambil", "selesai"].includes(
+      return ["disetujui", "selesai"].includes(
         item.status_laporan
       );
+    });
+  }
+
+  getActiveRecentItems(items) {
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      if (item.status_verifikasi !== "terverifikasi") {
+        return false;
+      }
+
+      if (item.jenis_laporan === "penemuan") {
+        return (
+          item.status_laporan === "selesai" &&
+          item.status_barang === "ditemukan"
+        );
+      }
+
+      if (item.jenis_laporan === "kehilangan") {
+        return (
+          item.status_laporan === "disetujui" &&
+          item.status_barang === "hilang"
+        );
+      }
+
+      return false;
     });
   }
 
