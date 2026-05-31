@@ -409,11 +409,17 @@ def get_admin_dashboard_summary(
         Laporan.status_laporan != "selesai"
     ).count()
 
-    total_found = db.query(Laporan).join(Barang, Laporan.barang_id == Barang.barang_id).filter(
+    total_found = db.query(Laporan.laporan_id).join(
+        Barang,
+        Laporan.barang_id == Barang.barang_id
+    ).join(
+        KlaimBarang,
+        KlaimBarang.barang_id == Barang.barang_id
+    ).filter(
         Laporan.jenis_laporan == "penemuan",
         Laporan.status_verifikasi == "terverifikasi",
-        Laporan.status_laporan != "selesai"
-    ).count()
+        KlaimBarang.status_klaim == "diproses"
+    ).distinct().count()
 
     pending_verification = db.query(Laporan).filter(
         Laporan.status_verifikasi == "belum_diverifikasi"
@@ -423,8 +429,9 @@ def get_admin_dashboard_summary(
         KlaimBarang.status_klaim == "diproses"
     ).count()
 
-    returned_items = db.query(Barang).filter(
-        Barang.status_barang == "selesai"
+    returned_items = db.query(Laporan).filter(
+        Laporan.status_verifikasi == "terverifikasi",
+        Laporan.status_laporan == "selesai"
     ).count()
 
     db.close()

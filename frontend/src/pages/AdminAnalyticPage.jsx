@@ -234,7 +234,7 @@ class AdminAnalyticsPage extends Component {
 
             {/* BARIS 1: Ringkasan Kartu Metrik Utama */}
             <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {/* Total barang ditemukan */}
+              {/* Total barang dikembalikan */}
               <div className="bg-white rounded-[20px] p-6 shadow-sm border-l-4 border-[#002B5B] flex flex-col justify-between">
                 <div className="flex justify-between items-center mb-4">
                   <div className="w-10 h-10 bg-blue-50 text-[#002B5B] rounded-xl flex items-center justify-center">
@@ -245,7 +245,7 @@ class AdminAnalyticsPage extends Component {
                   </span>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Total Barang Ditemukan</p>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Total Barang Dikembalikan</p>
                   <p className="text-4xl font-black text-[#002B5B]">{stats.total_found.toLocaleString()}</p>
                 </div>
               </div>

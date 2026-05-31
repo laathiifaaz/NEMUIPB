@@ -39,6 +39,7 @@ def get_admin_analytics(db, time_range="30_hari", location_filter="tinggi"):
         .all()
     )
     claims = db.query(KlaimBarang).all()
+    barang_by_id = {barang.barang_id: barang for _, barang in report_rows}
 
     current_reports = [
         (laporan, barang)
@@ -56,26 +57,39 @@ def get_admin_analytics(db, time_range="30_hari", location_filter="tinggi"):
         if laporan.status_verifikasi == "terverifikasi"
     ]
 
-    found_reports = [
-        (laporan, barang)
-        for laporan, barang in current_reports
-        if laporan.jenis_laporan == "penemuan"
-        and laporan.status_verifikasi == "terverifikasi"
-    ]
-    previous_found_reports = [
-        (laporan, barang)
-        for laporan, barang in previous_reports
-        if laporan.jenis_laporan == "penemuan"
-        and laporan.status_verifikasi == "terverifikasi"
-    ]
     returned_reports = [
         (laporan, barang)
         for laporan, barang in current_reports
-        if barang.status_barang == "selesai"
+        if laporan.status_verifikasi == "terverifikasi"
+        and laporan.status_laporan == "selesai"
     ]
 
-    total_found = len(found_reports)
-    success_rate_value = round((len(returned_reports) / total_found) * 100, 1) if total_found else 0
+    total_returned_items = _returned_item_count(claims, barang_by_id)
+    current_returned_items = _returned_item_count(
+        claims,
+        barang_by_id,
+        current_start,
+        now
+    )
+    previous_returned_items = _returned_item_count(
+        claims,
+        barang_by_id,
+        previous_start,
+        previous_end
+    )
+    active_lost_reports = [
+        laporan
+        for laporan, _ in report_rows
+        if laporan.jenis_laporan == "kehilangan"
+        and laporan.status_verifikasi == "terverifikasi"
+        and laporan.status_laporan != "selesai"
+    ]
+    success_denominator = total_returned_items + len(active_lost_reports)
+    success_rate_value = (
+        round((total_returned_items / success_denominator) * 100, 1)
+        if success_denominator
+        else 0
+    )
     avg_return_hours = _average_return_hours(claims, current_start, now)
     previous_avg_return_hours = _average_return_hours(
         claims,
@@ -85,8 +99,8 @@ def get_admin_analytics(db, time_range="30_hari", location_filter="tinggi"):
 
     return {
         "stats": {
-            "total_found": total_found,
-            "found_trend": _format_count_trend(total_found, len(previous_found_reports)),
+            "total_found": total_returned_items,
+            "found_trend": _format_count_trend(current_returned_items, previous_returned_items),
             "success_rate": f"{success_rate_value}%",
             "success_status": "Target Met" if success_rate_value >= 70 else "Needs Attention",
             "avg_return_time": _format_hours(avg_return_hours),
@@ -165,6 +179,25 @@ def _format_count_trend(current, previous):
     return f"{prefix}{round(change)}%"
 
 
+def _returned_item_count(claims, barang_by_id, start=None, end=None):
+    returned_barang_ids = set()
+
+    for claim in claims:
+        if claim.status_klaim != "diterima":
+            continue
+
+        barang = barang_by_id.get(claim.barang_id)
+        if not barang or barang.status_barang != "selesai":
+            continue
+
+        if start and end and not _is_in_range(claim.updated_time, start, end):
+            continue
+
+        returned_barang_ids.add(claim.barang_id)
+
+    return len(returned_barang_ids)
+
+
 def _average_return_hours(claims, start, end):
     durations = []
 
@@ -215,7 +248,7 @@ def _build_monthly_trends(report_rows, now):
             "returned": 0,
         })
 
-    for _, barang in report_rows:
+    for laporan, barang in report_rows:
         item_date = _item_datetime(barang)
         if not item_date:
             continue
@@ -224,7 +257,7 @@ def _build_monthly_trends(report_rows, now):
             if item_date.year == bucket["year"] and item_date.month == bucket["month_number"]:
                 bucket["reported"] += 1
 
-                if barang.status_barang == "selesai":
+                if laporan.status_laporan == "selesai":
                     bucket["returned"] += 1
 
                 break

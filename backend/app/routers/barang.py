@@ -32,10 +32,19 @@ def get_all_barang():
         .all()
     )
     claim_map = {}
+    accepted_claim_by_found_barang = {}
+    accepted_claim_by_lost_report = {}
     for claim in claim_rows:
         key = claim.barang_id
         if key not in claim_map:
             claim_map[key] = claim
+
+        if claim.status_klaim == "diterima":
+            if claim.barang_id not in accepted_claim_by_found_barang:
+                accepted_claim_by_found_barang[claim.barang_id] = claim
+
+            if claim.laporan_kehilangan_id not in accepted_claim_by_lost_report:
+                accepted_claim_by_lost_report[claim.laporan_kehilangan_id] = claim
 
     barang = [
         {
@@ -47,6 +56,12 @@ def get_all_barang():
             "status_verifikasi": laporan.status_verifikasi if laporan else None,
             "status_klaim": claim_map.get(item.barang_id).status_klaim if claim_map.get(item.barang_id) else None,
             "klaim_id": claim_map.get(item.barang_id).klaim_id if claim_map.get(item.barang_id) else None,
+            "returned_group_id": _get_returned_group_id(
+                item,
+                laporan,
+                accepted_claim_by_found_barang,
+                accepted_claim_by_lost_report
+            ),
             "nama_barang": item.nama_barang,
             "kategori": item.kategori,
             "deskripsi": item.deskripsi,
@@ -60,6 +75,29 @@ def get_all_barang():
 
     db.close()
     return barang
+
+
+def _get_returned_group_id(
+    item,
+    laporan,
+    accepted_claim_by_found_barang,
+    accepted_claim_by_lost_report
+):
+    if not laporan:
+        return f"barang-{item.barang_id}"
+
+    claim = None
+
+    if laporan.jenis_laporan == "penemuan":
+        claim = accepted_claim_by_found_barang.get(item.barang_id)
+
+    if laporan.jenis_laporan == "kehilangan":
+        claim = accepted_claim_by_lost_report.get(laporan.laporan_id)
+
+    if claim:
+        return f"claim-{claim.klaim_id}"
+
+    return f"barang-{item.barang_id}"
 
 
 @router.get("/search")

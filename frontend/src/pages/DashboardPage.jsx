@@ -70,9 +70,7 @@ class DashboardPage extends Component {
         recentItems: sortedItems,
         totalLostItems: verifiedItems.filter((item) => item.status_barang === "ditemukan")
           .length,
-        totalReturnedItems: verifiedItems.filter((item) =>
-          ["selesai", "dikembalikan"].includes(item.status_barang)
-        ).length,
+        totalReturnedItems: this.getReturnedItemsCount(verifiedItems),
         loadingRecent: false,
       });
 
@@ -123,9 +121,7 @@ class DashboardPage extends Component {
         recentItems: sortedItems,
         totalLostItems: verifiedItems.filter((item) => item.status_barang === "ditemukan")
           .length,
-        totalReturnedItems: verifiedItems.filter((item) =>
-          ["selesai", "dikembalikan"].includes(item.status_barang)
-        ).length,
+        totalReturnedItems: this.getReturnedItemsCount(verifiedItems),
         loadingRecent: false,
       });
 
@@ -150,7 +146,7 @@ class DashboardPage extends Component {
 
   getVisibleUserItems(items) {
     return (Array.isArray(items) ? items : []).filter((item) => {
-      const allowedStatus = ["hilang", "ditemukan", "selesai"].includes(
+      const allowedStatus = ["hilang", "ditemukan", "selesai", "dikembalikan"].includes(
         item.status_barang
       );
 
@@ -166,6 +162,22 @@ class DashboardPage extends Component {
         item.status_laporan
       );
     });
+  }
+
+  getReturnedItemsCount(items) {
+    const returnedGroups = new Set();
+
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      if (!["selesai", "dikembalikan"].includes(item.status_barang)) {
+        return;
+      }
+
+      returnedGroups.add(
+        item.returned_group_id || item.klaim_id || item.barang_id
+      );
+    });
+
+    return returnedGroups.size;
   }
 
   getItemImage(item) {

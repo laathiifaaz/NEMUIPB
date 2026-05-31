@@ -212,8 +212,12 @@ class KlaimService:
 
         if claim_domain.is_accepted():
             pickup_message = self._accept_claim(claim, admin, pickup_code)
+            rejected_claims_count = self._reject_other_pending_claims_for_barang(
+                accepted_claim=claim
+            )
         else:
             pickup_message = "Klaim barang Anda ditolak oleh admin."
+            rejected_claims_count = 0
 
         self.db.add(Notifikasi(
             user_id=claim.user_id,
@@ -228,7 +232,8 @@ class KlaimService:
         return {
             "message": f"Klaim {status_klaim}",
             "klaim_id": klaim_id,
-            "pickup_code": pickup_code
+            "pickup_code": pickup_code,
+            "rejected_other_claims": rejected_claims_count
         }
 
     def verify_pickup_code(self, pickup_code, admin):
@@ -322,6 +327,32 @@ class KlaimService:
             "Tunjukkan kode ini ke admin saat mengambil barang di Kantor Pusat "
             "NEMU IPB, Senin-Jumat 08.00-17.00 WIB."
         )
+
+    def _reject_other_pending_claims_for_barang(self, accepted_claim):
+        rejected_claims = self.db.query(KlaimBarang).filter(
+            KlaimBarang.barang_id == accepted_claim.barang_id,
+            KlaimBarang.klaim_id != accepted_claim.klaim_id,
+            KlaimBarang.status_klaim == KlaimDomain.PENDING
+        ).all()
+
+        rejection_note = "Barang sudah diklaim oleh user lain"
+        encrypted_note = encryption_service.encrypt_if_exists(rejection_note)
+        now = datetime.now()
+
+        for claim in rejected_claims:
+            claim.status_klaim = KlaimDomain.REJECTED
+            claim.catatan_admin = encrypted_note
+            claim.updated_time = now
+
+            self.db.add(Notifikasi(
+                user_id=claim.user_id,
+                laporan_id=claim.laporan_kehilangan_id,
+                pesan=rejection_note,
+                tanggal_kirim=now,
+                status_baca=False
+            ))
+
+        return len(rejected_claims)
 
     def build_dropoff_note(self, dropoff_code, catatan_admin):
         note = (catatan_admin or "").strip()
