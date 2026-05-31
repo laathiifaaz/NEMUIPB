@@ -336,7 +336,7 @@ class KoleksiBarangPage extends Component {
   getItemImage(item) {
     if (item.foto_url) return item.foto_url;
     if (item.dokumentasi?.startsWith("data:image/")) return item.dokumentasi;
-    if (item.dokumentasi?.startsWith("http")) return item.dokumentasi;
+    if (item.dokumentasi?.startsWith("https")) return item.dokumentasi;
     if (item.dokumentasi?.startsWith("/")) return item.dokumentasi;
     if (item.dokumentasi) return `/images/${item.dokumentasi}`;
 
