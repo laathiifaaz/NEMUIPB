@@ -2,7 +2,7 @@ import ApiService from "./ApiServices";
 
 class BarangService extends ApiService {
   async getAllBarang() {
-    const res = await fetch(`${this.baseUrl}/barang`);
+    const res = await fetch(`${this.baseUrl}/barang/`);
     return this.handleResponse(res);
   }
 
